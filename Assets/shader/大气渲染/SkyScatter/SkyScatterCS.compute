@@ -1,0 +1,267 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+RWTexture2D<float4> Result;
+
+Texture2D<float4> _transmittanceLut;
+SamplerState samplerLinearClamp;
+
+Texture2D<float4> moonTex;
+SamplerState sampler_PointClamp;
+
+float3 SunDir;
+
+float3 eyePos;
+float PlanetRadius;
+float AtmosphereHeight;
+float RayleighScatteringScalarHeight;
+float MieScatteringScalarHeight;
+float MieAnisotropy;
+float OzoneLevelCenterHeight;
+float OzoneLevelWidth;
+float4 sunLuminance;
+float4 _GradientNight;
+
+
+#define N_SAMPLE 50
+#define WIDTH 256
+#define HEIGHT 128
+#define PI  3.1415926
+
+float3 UVToViewDir(float2 uv)
+{
+    float theta = (1.0 - uv.y) * PI;
+    float phi = (uv.x * 2 - 1) * PI;
+    
+    float x = sin(theta) * cos(phi);
+    float z = sin(theta) * sin(phi);
+    float y = cos(theta);
+
+    return float3(x, y, z);
+}
+
+float2 ViewDirToUV(float3 v)
+{
+    float2 uv = float2(atan2(v.z, v.x), asin(v.y));
+    uv /= float2(2.0 * PI, PI);
+    uv += float2(0.5, 0.5);
+
+    return uv;
+}
+
+float RayIntersectSphere(float3 rayOrigin, float3 rayDir, float3 sphereCenter, float sphereRadius)
+{
+    
+    
+    rayDir = normalize(rayDir);
+    float3 oc = rayOrigin - sphereCenter;
+    float b = dot(oc, rayDir);
+    float c = dot(oc, oc) - sphereRadius * sphereRadius;
+    float discriminant = b * b - c;
+
+    if (discriminant < 0)
+        return -1.0;
+
+    float sqrtD = sqrt(discriminant);
+    float t1 = -b - sqrtD;
+    float t2 = -b + sqrtD;
+
+    
+    if (t1 > 0)
+        return t1;
+    if (t2 > 0)
+        return t2;
+    return -1.0;
+}
+
+float3 RayleighCoefficient(float h)
+{
+    float3 sigma = float3(5.802, 13.558, 33.1) * 1e-6;
+    float H_R = RayleighScatteringScalarHeight;
+    float rho_h = exp(-(h / H_R));
+    return sigma * rho_h;
+}
+
+float RayleighPhase(float cos_theta)
+{
+    return (3.0 / (16.0 * PI)) * (1.0 + cos_theta * cos_theta);
+}
+
+
+float3 MieCoefficient(float h)
+{
+    float3 sigma = (3.996 * 1e-6).xxx;
+    float H_M = MieScatteringScalarHeight;
+    float rho_h = exp(-(h / H_M));
+    return sigma * rho_h;
+}
+        
+float MiePhase(float cos_theta)
+{
+  //  float g = MieAnisotropy;
+   // float a = 3.0 / (8.0 * PI);
+   // float b = (1.0 - g * g) / (2.0 + g * g);
+   // float c = 1.0 + cos_theta * cos_theta;
+    
+   // float d = pow(1.0 + g * g - 2 * g * cos_theta, 1.5);
+    //return a * b * (c / d);
+    
+    float g = MieAnisotropy;
+    float g2 = g * g;
+    return (1.0 - g2) / (4.0 * PI * pow(abs(1.0 + g2 - 2.0 * g * cos_theta), 1.5));
+}
+
+float3 Scattering(float3 p, float3 inDir, float3 outDir)
+{
+    float cos_theta = dot(inDir, outDir);
+    float h = length(p) - PlanetRadius;
+    float3 rayleigh = RayleighCoefficient(h) * RayleighPhase(cos_theta);
+ //
+    float3 mie = MieCoefficient(h) * MiePhase(cos_theta);
+ //
+    return rayleigh + mie;
+}
+
+float3 MieAbsorption(float h)
+{
+    const float3 sigma = (4.4 * 1e-6).xxx;
+    float H_M = MieScatteringScalarHeight;
+    float rho_h = exp(-(h / H_M));
+    return sigma * rho_h;
+}
+
+float3 OzoneAbsorption(float h)
+{
+    const float3 sigma_lambda = float3(0.650f, 1.881f, 0.085f) * 1e-6;
+    float center = OzoneLevelCenterHeight;
+    float width = OzoneLevelWidth;
+    float rho = max(0, 1.0 - (abs(h - center) / width));
+    return sigma_lambda * rho;
+}
+
+
+float3 ComputeViewDirFromUV(float2 uv)
+{
+    
+    float theta = (1.0 - uv.y) * PI;
+    float phi = (uv.x * 2 - 1) * PI;
+    
+    float x = sin(theta) * cos(phi);
+    float z = sin(theta) * sin(phi);
+    float y = cos(theta);
+
+    return float3(x, y, z);
+}
+
+float2 GetTransmittanceLutUv(float bottomRadius, float topRadius, float mu, float r)
+{
+    float H = sqrt(topRadius * topRadius - bottomRadius * bottomRadius);
+    float rho = sqrt(r * r - bottomRadius * bottomRadius);
+    
+    float discriminant = r * r * (mu * mu - 1.0) + topRadius * topRadius;
+    float d = max(0.0, (-r * mu + sqrt(discriminant)));
+    
+    float d_min = topRadius - r;
+    float d_max = rho + H;
+    float x_mu = (d - d_min) / (d_max - d_min);
+    float x_r = rho / H;
+    
+    return float2(x_mu, x_r);
+}
+
+float3 TransmittanceToAtmosphere(float3 p, float3 dir, Texture2D lut, SamplerState spl)
+{
+    float bottomRadius = PlanetRadius * 1e-3;
+    float topRadius = PlanetRadius * 1e-3 + AtmosphereHeight * 1e-3;
+    
+    float3 upVector = normalize(p);
+    float cos_theta = dot(upVector, dir);
+    float r = length(p) * 1e-3;
+    
+    float2 uv = GetTransmittanceLutUv(bottomRadius, topRadius, cos_theta, r);
+    return lut.SampleLevel(spl, uv, 0).rgb;
+    
+}
+
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= WIDTH || id.y >= HEIGHT)
+        return;
+    float2 uv = id.xy / float2(WIDTH, HEIGHT);
+    float3 viewDir = UVToViewDir(uv);
+    //float3 viewDir = float3(1, 0.5, 0.5);
+    //float3 gradientDay = lerp(_DayBottomColor, _DayTopColor, saturate(viewDir.y));
+    //float3 gradientNight = lerp(_NightBottomColor, _NightTopColor, saturate(viewDir.y));
+   // float3 skyGradients = lerp(_GradientNight.xyz, _GradientDay.xyz, saturate(SunDir.y));
+    
+    
+    float3 color = float3(0, 0, 0);
+    float3 opticalDepth = float3(0, 0, 0);
+        
+    float p2 = RayIntersectSphere(eyePos, viewDir, float3(0, 0, 0), PlanetRadius + AtmosphereHeight);
+    
+    float p2_1 = RayIntersectSphere(eyePos, viewDir, float3(0, 0, 0), PlanetRadius);
+    
+    if (p2 < 0)
+    {
+        Result[id.xy] = float4(color * viewDir, 1.0);
+    }
+    else
+    {
+        if (p2_1 > 0)
+            p2 = min(p2, p2_1);
+    
+        float ds = p2 / float(N_SAMPLE);
+        float3 p = eyePos + (viewDir * ds) * 0.5;
+       
+    
+    
+        for (int i = 0; i < N_SAMPLE; i++)
+        {
+    
+            float sp2 = RayIntersectSphere(p, SunDir, float3(0, 0, 0), PlanetRadius);
+            
+           
+            
+            float3 lightDir = SunDir;
+            float h = length(p) - PlanetRadius;
+       
+            float3 extinction = RayleighCoefficient(h) + MieCoefficient(h) + OzoneAbsorption(h) + MieAbsorption(h);
+            opticalDepth = opticalDepth + extinction * ds;
+            
+            float3 s = Scattering(p, lightDir, viewDir);
+        
+            float3 t2 = exp(-opticalDepth);            
+            float3 t1 = 0.0;
+            float3 inScattering;
+            
+            if (sp2 < 0)
+               { t1 = TransmittanceToAtmosphere(p, lightDir, _transmittanceLut, samplerLinearClamp);
+                inScattering = t1 * s * t2 * ds * sunLuminance.xyz;
+            }
+            else
+            {
+                t1 = TransmittanceToAtmosphere(p, -lightDir, _transmittanceLut, samplerLinearClamp);
+                inScattering = t1 * s * t2 * ds * _GradientNight.xyz;
+            }
+        
+             
+            //t1 = TransmittanceToAtmosphere(p, lightDir, _transmittanceLut, samplerLinearClamp);
+            //inScattering = t1 * s * t2 * ds * sunLuminance.xyz;
+        
+            
+        
+            color = color + inScattering;
+            // color += GetMultiScattering(p, lightDir) * t2 * ds * sunLuminance.xyz;
+            
+            p = p + viewDir * ds;
+        
+        }
+       
+        Result[id.xy] = float4(color, 1.0);
+    }
+}

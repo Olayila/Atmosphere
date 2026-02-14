@@ -1,0 +1,187 @@
+#ifndef _TK_MATERIAL
+#define _TK_MATERIAL
+#include "../common/color.hlsl"
+#include "StandardSampler.hlsl"
+//mapping通常解释为纹理采样
+struct MappingInfoTK
+{
+    float2 uv; //主纹理
+    float2 detail_uv; //细节纹理，通常有独立缩放
+    float3 worldPos;
+    float3 worldNormal;
+    float3 worldTangent;
+    float3 worldBinormal;
+    float2 pixelId; //通常是屏幕空间 UV（screenPos.xy / screenPos.w），用于屏幕空间效果（如抓屏、后处理、边缘检测、像素化）
+    float3 viewDir;
+};
+
+struct TK_GIInput
+{
+    // 直接光源信息（主光源为主，类似原来的 UnityLight）
+    Light mainLight; // 使用 URP 的 Light 结构体，包含 direction/color/distanceAttenuation/shadowAttenuation
+
+    // 世界空间位置 & 视角方向（最核心的两个）
+    float3 worldPos; // 像素世界位置
+    float3 worldViewDir; // 世界空间视线方向（已归一化）
+
+    // 直接光最终衰减（阴影 + 距离衰减的乘积）
+    half atten; // 你可以自己算，也可以直接用 mainLight.distanceAttenuation * mainLight.shadowAttenuation
+
+    // 间接漫反射（bakedGI / 环境光）
+    half3 indirectDiffuse; // 已解码的光照贴图或 SH 结果
+
+    // 间接镜面反射（可选，如果你需要自己算 Reflection Probe）
+    half3 indirectSpecular;
+
+    // 光照贴图 UV（如果你还想支持 Unity 的 unity_Lightmap）
+    float2 lightmapUV; // 只需 float2 就够了（xy）
+    
+    half3 ambient;
+
+    // 可选：如果你需要其他高级信息
+    half occlusion; // 环境遮挡（AO）
+    half shadowMask; // Baked ShadowMask（如果使用）
+    // half3 vertexSH;             // 如果你还想保留顶点球谐（一般不需要）
+};
+
+struct MaterialParameter
+{
+    float3 basecolor;
+    float roughness;
+    float metallic;
+    float3 emission;
+    float alpha;
+
+#if defined(_TK_THINFILM_ON)
+        bool thinFilmMask;
+        float top_ior;
+        float middle_ior;
+        float middle_thickness;
+        float3 bottom_ior;
+        float3 bottom_kappa;
+#endif
+
+#if defined(_TK_CLOTH_ON)
+        float3 clothAlbedo1;
+        float3 clothAlbedo2;
+        float clothKd1;
+        float clothKd2;
+        float clothIOR1;
+        float clothIOR2;
+        float clothGammaS1;
+        float clothGammaS2;
+        float clothGammaV1;
+        float clothGammaV2;
+        float clothAlpha1;
+        float clothAlpha2;
+        float4 clothTangentOffset1;
+        float4 clothTangentOffset2;
+#endif
+};
+
+static inline float3 ShlickFresnelF0(float3 F0, float wdotn)
+{
+    float term1 = 1.0f - wdotn;
+    return F0 + (1.0f - F0) * term1 * term1 * term1 * term1 * term1;
+}
+
+inline float3 DetailMapCombineTK(float3 maintex, float3 detailtex, float mask)
+{
+#ifdef _TK_DETAIL_BLEND_LINNER
+        return lerp(maintex, detailtex, mask);
+#elif _TK_DETAIL_BLEND_ADD
+        return lerp(maintex, maintex + detailtex, mask);
+#elif _TK_DETAIL_BLEND_MULTIPLY
+        return lerp(maintex, maintex * detailtex, mask);
+#elif _TK_DETAIL_BLEND_SUBTRACT
+        return lerp(maintex, maintex - detailtex, mask);
+#else
+    return lerp(maintex, detailtex, mask);
+#endif
+}
+
+void SetMaterialParameterTK(inout MaterialParameter matParam, MappingInfoTK mapInfo, inout float3 shadingNormal)
+{
+    //将视线方向转换到TBN坐标系
+    float3 viewDir = worldToLocal(mapInfo.worldTangent, mapInfo.worldNormal, mapInfo.worldBinormal, mapInfo.viewDir);
+    //将pallaxMap反映到uv映射中，类似bump图的处理方式，SAMPLE2D_PALLAX_TK包含三种处理方式，最主要影响因素为viewDir
+    float2 pallaxoffset = SAMPLE2D_PALLAX_TK(_PallaxMap, sampler_PallaxMap, mapInfo.uv, _PallaxMap_ST, mapInfo.worldPos, mapInfo.worldNormal, mapInfo.pixelId, viewDir);
+    float4 uvOffset = float4(0, 0, pallaxoffset);
+
+    //Basecolor
+    float4 baseColor = SAMPLE2D_MAINTEX_TK(_MainTex, sampler_MainTex, mapInfo.uv, _MainTex_ST + uvOffset, mapInfo.worldPos, mapInfo.worldNormal, mapInfo.pixelId);
+    matParam.basecolor = _Color.xyz * baseColor.xyz;
+    matParam.alpha = baseColor.a;
+    matParam.roughness = _Roughness * SAMPLE2D_MAINTEX_TK(_RoughnessMap, sampler_RoughnessMap, mapInfo.uv, _RoughnessMap_ST + uvOffset, mapInfo.worldPos, mapInfo.worldNormal, mapInfo.pixelId).r;
+    matParam.metallic = _Metallic * SAMPLE2D_MAINTEX_TK(_MetallicGlossMap, sampler_MetallicGlossMap, mapInfo.uv, _MetallicGlossMap_ST + uvOffset, mapInfo.worldPos, mapInfo.worldNormal, mapInfo.pixelId).r;
+
+    matParam.emission = _EmissionColor * SAMPLE2D_MAINTEX_TK(_EmissionMap, sampler_EmissionMap, mapInfo.uv, _EmissionMap_ST + uvOffset, mapInfo.worldPos, mapInfo.worldNormal, mapInfo.pixelId);
+
+    shadingNormal = normalize(SAMPLE2D_NORMALMAP_TK(_BumpMap, sampler_BumpMap, mapInfo.uv, _BumpMap_ST + uvOffset,
+    mapInfo.worldPos, mapInfo.worldNormal, mapInfo.worldTangent, mapInfo.worldBinormal, mapInfo.pixelId, _BumpScale));
+
+#if defined(_TK_DETAIL_ON)
+        float detail_mask = SAMPLE2D_DETAILMAP_TK(_DetailMaskMap, sampler_MainTex, mapInfo.detail_uv, _DetailMaskMap_ST + uvOffset, mapInfo.worldPos, mapInfo.worldNormal, mapInfo.pixelId).r * _DetailMaskFactor;
+        float3 detail_basecolor = SAMPLE2D_DETAILMAP_TK(_DetailAlbedoMap, sampler_MainTex, mapInfo.detail_uv, _DetailAlbedoMap_ST + uvOffset, mapInfo.worldPos, mapInfo.worldNormal, mapInfo.pixelId).rgb * _DetailAlbedo;
+        float detail_roughness = SAMPLE2D_DETAILMAP_TK(_DetailRoughnessMap, sampler_MainTex, mapInfo.detail_uv, _DetailRoughnessMap_ST + uvOffset, mapInfo.worldPos, mapInfo.worldNormal, mapInfo.pixelId).r * _DetailRoughness;
+        float detail_metallic = SAMPLE2D_DETAILMAP_TK(_DetailMetallicMap, sampler_MainTex, mapInfo.detail_uv, _DetailMetallicMap_ST + uvOffset, mapInfo.worldPos, mapInfo.worldNormal, mapInfo.pixelId).r * _DetailMetallic;
+        float3 detail_normal = SAMPLE2D_DETAILNORMALMAP_TK(_DetailNormalMap, sampler_MainTex, mapInfo.detail_uv, _DetailNormalMap_ST + uvOffset, mapInfo.worldPos, mapInfo.worldNormal, mapInfo.worldTangent, mapInfo.worldBinormal, mapInfo.pixelId, _DetalNormalMapScale);
+
+        matParam.basecolor = clamp(DetailMapCombineTK(matParam.basecolor, detail_basecolor, detail_mask), 0.0, 1.0);
+        matParam.roughness = clamp(DetailMapCombineTK(matParam.roughness, detail_roughness, detail_mask).r, 0.0, 1.0);
+        matParam.metallic = clamp(DetailMapCombineTK(matParam.metallic, detail_metallic, detail_mask).r, 0.0, 1.0);
+
+        float3 blendnormal = BlendNormals(shadingNormal, detail_normal);
+        shadingNormal = lerp(shadingNormal, blendnormal, detail_mask);
+        //shadingNormal = blendnormal;
+#endif
+
+    shadingNormal = normalize(localToWorld(mapInfo.worldTangent, mapInfo.worldNormal, mapInfo.worldBinormal, float3(shadingNormal.x, shadingNormal.z, shadingNormal.y)));
+
+    //ThinFilm Parametor
+#if defined(_TK_THINFILM_ON)
+        float thickness_value = SAMPLE2D_MAINTEX_TK(_ThinFilmMiddleThicknessMap, sampler_MainTex, mapInfo.uv, _ThinFilmMiddleThicknessMap_ST + uvOffset, mapInfo.worldPos, mapInfo.worldNormal, mapInfo.pixelId) * _ThinFilmMiddleThickness;
+        float thickness = lerp(_ThinFilmMiddleThicknessMin, _ThinFilmMiddleThicknessMax, thickness_value); //nm
+
+        matParam.middle_thickness = thickness;
+        matParam.middle_ior = _ThinFilmMiddleIOR;
+        matParam.top_ior = 1.0;
+
+        float3 dietric_ior = 1.5;
+        float3 dietric_kappa = 0.0;
+
+        float3 metal_color = clamp(matParam.basecolor.rgb, 0.001, 0.999); //avoid NaN
+        float3 edge_tint = ShlickFresnelF0(metal_color, 0.75); //Magic Number TODO:Find better value
+        float3 metallic_ior = rToIOR(metal_color, edge_tint);
+        float3 metallic_kappa = rToKappa(metal_color, metallic_ior);
+
+        float3 metallic_color = getR(metallic_ior, metallic_kappa);
+        float3 metallic_tint = getG(metallic_ior, metallic_kappa);
+        
+        metallic_ior = rToIOR(metallic_color, metallic_tint);
+        metallic_kappa = rToKappa(metallic_color, metallic_ior);
+
+        matParam.bottom_ior = lerp(dietric_ior, metallic_ior, matParam.metallic);
+        matParam.bottom_kappa = lerp(dietric_kappa, metallic_kappa, matParam.metallic);
+
+        matParam.thinFilmMask = SAMPLE2D_MAINTEX_TK(_ThinFilmMaskMap, sampler_MainTex, mapInfo.uv, _ThinFilmMaskMap_ST + uvOffset, mapInfo.worldPos, mapInfo.worldNormal, mapInfo.pixelId).r > 0.5;
+#endif
+
+#if defined(_TK_CLOTH_ON)
+        matParam.clothAlbedo1 = _ClothAlbedo1 * matParam.basecolor;
+        matParam.clothAlbedo2 = _ClothAlbedo2 * matParam.basecolor;
+        matParam.clothKd1 = _ClothKd1;
+        matParam.clothKd2 = _ClothKd2;
+        matParam.clothIOR1 = _ClothIOR1;
+        matParam.clothIOR2 = _ClothIOR2;
+        matParam.clothGammaS1 = _ClothGammaS1;
+        matParam.clothGammaS2 = _ClothGammaS2;
+        matParam.clothGammaV1 = _ClothGammaV1;
+        matParam.clothGammaV2 = _ClothGammaV2;
+        matParam.clothAlpha1 = _ClothAlpha1;
+        matParam.clothAlpha2 = _ClothAlpha2;
+        matParam.clothTangentOffset1 = _ClothTangentOffset1;
+        matParam.clothTangentOffset2 = _ClothTangentOffset2;
+#endif
+}
+#endif

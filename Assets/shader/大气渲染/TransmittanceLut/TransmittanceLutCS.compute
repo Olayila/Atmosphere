@@ -1,0 +1,122 @@
+#pragma kernel CSTransmittanceLut
+#define TRANSMITTANCE_WIDTH 512
+#define TRANSMITTANCE_HEIGHT 128
+#define N_STEPS 500
+#define LINEAR_MAPPING 0
+
+RWTexture2D<float4> _TransmittanceLut;
+
+
+static const float kEarthRadius = 6360.0; 
+static const float kAtmosphereRadius = 6420.0;
+static const float kHeightR = 8.0; 
+static const float kHeightM = 1.2; 
+static const float3 kBetaR = float3(5.802e-3, 13.558e-3, 33.100e-3); 
+static const float3 kBetaM = float3(0.0044, 0.0044, 0.0044); 
+static const float3 kBetaOzone = float3(0.000650, 0.001881, 0.000085);
+
+float SafeSqrt(float a)
+{
+    return sqrt(max(a, 0.0));
+}
+float ClampCosine(float x)
+{
+    return clamp(x, -1.0, 1.0);
+}
+float ClampDist(float d)
+{
+    return max(d, 0.0);
+}
+
+float DistanceToTopAtmosphereBoundary(float r, float mu)
+{
+    float discriminant = r * r * (mu * mu - 1.0) + kAtmosphereRadius * kAtmosphereRadius;
+    return ClampDist(-r * mu + SafeSqrt(discriminant));
+}
+
+
+void GetRMuFromUVLinear(float uR, float uMu, out float r, out float mu)
+{
+    mu = uMu;
+    r = lerp(kEarthRadius, kAtmosphereRadius, uR);
+}
+void GetRMuFromUVOriginal08(float uR, float uMu, out float r, out float mu)
+{
+    mu = uMu;
+    mu = -0.15 + tan(1.5 * mu) / tan(1.5) * (1.0 + 0.15);
+    r = kEarthRadius + pow(uR, 2.0) * (kAtmosphereRadius - kEarthRadius);
+}
+void GetRMuFromUVNew17(float uR, float uMu, out float r, out float mu)
+{
+    float H = SafeSqrt(kAtmosphereRadius * kAtmosphereRadius - kEarthRadius * kEarthRadius);
+    float rho = H * uR;
+    r = SafeSqrt(rho * rho + kEarthRadius * kEarthRadius);
+    float d_min = kAtmosphereRadius - r;
+    float d_max = rho + H;
+    float d = d_min + uMu * (d_max - d_min);
+    mu = (d <= 0.0) ? 1.0 : (H * H - rho * rho - d * d) / (2.0 * r * d);
+    mu = ClampCosine(mu);
+}
+float ComputeOpticalLength(float h_scale, float r, float mu)
+{
+    float dx = DistanceToTopAtmosphereBoundary(r, mu) / float(N_STEPS);
+    float result = 0.0;
+    for (int i = 0; i <= N_STEPS; i++)
+    {
+        float d_i = float(i) * dx;
+        float r_i = SafeSqrt(d_i * d_i + 2.0 * r * mu * d_i + r * r);
+        float y_i = clamp(exp(-(r_i - kEarthRadius) / h_scale), 0.0, 1.0);
+        result += y_i * dx;
+    }
+    return result;
+}
+float ComputeOpticalLengthO3(float r, float mu)
+{
+    float dx = DistanceToTopAtmosphereBoundary(r, mu) / float(N_STEPS);
+    float result = 0.0;
+    for (int i = 0; i <= N_STEPS; i++)
+    {
+        float d_i = float(i) * dx;
+        float r_i = SafeSqrt(d_i * d_i + 2.0 * r * mu * d_i + r * r);
+        float height = r_i - kEarthRadius;
+        float linear_term = (height < 25.0) ? 0.066667 : -0.066667;
+        float constant_term = (height < 25.0) ? -0.66667 : 2.666667;
+        float y_i = clamp(linear_term * height + constant_term, 0.0, 1.0);
+        result += y_i * dx;
+    }
+    return result;
+}
+float3 ComputeTransmittance(float r, float mu)
+{
+    float3 attR = kBetaR * ComputeOpticalLength(kHeightR, r, mu);
+    float3 attM = kBetaM * ComputeOpticalLength(kHeightM, r, mu);
+    float3 att = attR + attM;
+#if(LINEAR_MAPPING==0)
+    att += kBetaOzone * ComputeOpticalLengthO3(r,mu);
+#endif
+    return exp(-att);
+}
+
+
+[numthreads(8, 8, 1)]
+void CSTransmittanceLut(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= TRANSMITTANCE_WIDTH || id.y >= TRANSMITTANCE_HEIGHT)
+        return;
+
+    float uMu = (id.x + 0.5) / TRANSMITTANCE_WIDTH;
+    float uR = (id.y + 0.5) / TRANSMITTANCE_HEIGHT;
+
+    float r, mu;
+#if(LINEAR_MAPPING==0)
+    GetRMuFromUVNew17(uR,uMu,r,mu);
+#elif(LINEAR_MAPPING==1)
+    GetRMuFromUVOriginal08(uR,uMu,r,mu);
+#elif(LINEAR_MAPPING==2)
+    GetRMuFromUVLinear(uR,uMu,r,mu);
+#endif
+
+    float3 trans = ComputeTransmittance(r, mu);
+    _TransmittanceLut[id.xy] = float4(trans, 1.0);
+}
+

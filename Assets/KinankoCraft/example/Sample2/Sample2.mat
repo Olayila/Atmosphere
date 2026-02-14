@@ -1,0 +1,185 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 6
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Sample2
+  m_Shader: {fileID: 4800000, guid: 7d5d40efc0fe6674fba9e6e9b95f0689, type: 3}
+  m_ShaderKeywords: _DEBUGMODE_NONE _LIGHTMAPMODE_NONE _MAPPINGMODE_NONE _PARALLAXMODE_NONE
+    _SAMPLERMODE_NONE _SHMODE_NONLINER _TK_DETAIL_BLEND_LINNER _TK_DETAIL_MAPPINGMODE_NONE
+    _TK_DETAIL_SAMPLERMODE_NONE _TK_THINFILM_ON
+  m_LightmapFlags: 0
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap:
+    RenderType: Opaque
+  disabledShaderPasses: []
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _AddLightmap1:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _AddLightmap2:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _AddLightmap3:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BumpMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DetailAlbedoMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DetailMask:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DetailMaskMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DetailMetallicMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DetailNormalMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DetailRoughnessMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _EmissionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MetallicGlossMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _OcclusionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _PallaxMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _ParallaxMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _RoughnessMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _ThinFilmMaskMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _ThinFilmMiddleThicknessMap:
+        m_Texture: {fileID: 2800000, guid: cb8fa2550934bbe4eb0897e07c311ae0, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Floats:
+    - _AddLightmap1_ON: 0
+    - _AddLightmap1_Power: 1
+    - _AddLightmap2_ON: 0
+    - _AddLightmap2_Power: 1
+    - _AddLightmap3_ON: 0
+    - _AddLightmap3_Power: 1
+    - _BlendMode: 0
+    - _BumpScale: 1
+    - _ClothAlpha1: 0.86
+    - _ClothAlpha2: 0.14
+    - _ClothGammaS1: 4
+    - _ClothGammaS2: 5
+    - _ClothGammaV1: 8
+    - _ClothGammaV2: 10
+    - _ClothIOR1: 1.345
+    - _ClothIOR2: 1.345
+    - _ClothKd1: 0.1
+    - _ClothKd2: 0.7
+    - _Cloth_ON: 0
+    - _Cull: 2
+    - _Cutoff: 0.5
+    - _DebugMenu: 0
+    - _DebugMode: 0
+    - _DetailBlendMode: 0
+    - _DetailMappingMode: 0
+    - _DetailMaskFactor: 0
+    - _DetailMetallic: 0
+    - _DetailNormalMapScale: 1
+    - _DetailRoughness: 0
+    - _DetailSamplerMode: 0
+    - _Detail_ON: 0
+    - _DetalNormalMapScale: 1
+    - _Diffuse_Power: 1
+    - _DstBlend: 0
+    - _Emission: 0
+    - _EmissionMenu: 1
+    - _EmissionMode: 2
+    - _ExperimentalMenu: 0
+    - _GlossMapScale: 1
+    - _Glossiness: 0.5
+    - _GlossyReflections: 1
+    - _IBLReflection_Power: 1
+    - _LightProbeSH_Power: 1
+    - _LightmapMenu: 0
+    - _LightmapMode: 0
+    - _LightmapPower: 1
+    - _MainTexMenu: 1
+    - _MappingMode: 0
+    - _MappingPosObj: 0
+    - _Metallic: 1
+    - _Mode: 0
+    - _OcclusionStrength: 1
+    - _PallaxMode: 0
+    - _PallaxScale: 0.02
+    - _Parallax: 0.02
+    - _RealTimeLight_Power: 1
+    - _RenderModeMenu: 1
+    - _Roughness: 0.087
+    - _SHModeNonLiner: 1
+    - _SHSpecular: 0
+    - _SamplerMode: 0
+    - _SmoothnessTextureChannel: 0
+    - _SpecularHighlights: 1
+    - _SpecularOcclusion: 0
+    - _SpecularOcclusionPower: 1
+    - _Specular_Power: 1
+    - _SrcBlend: 1
+    - _ThinFilmMenu: 1
+    - _ThinFilmMiddleIOR: 2.65
+    - _ThinFilmMiddleThickness: 1
+    - _ThinFilmMiddleThicknessMax: 164.4
+    - _ThinFilmMiddleThicknessMin: 101.4
+    - _ThinFilm_ON: 1
+    - _UVSec: 0
+    - _ZWrite: 1
+    m_Colors:
+    - _ClothAlbedo1: {r: 0.1, g: 1, b: 0.4, a: 1}
+    - _ClothAlbedo2: {r: 1, g: 0, b: 0.1, a: 1}
+    - _ClothTangentOffset1: {r: -25, g: -25, b: 25, a: 25}
+    - _ClothTangentOffset2: {r: 0, g: 0, b: 0, a: 0}
+    - _Color: {r: 0.8679245, g: 0.8679245, b: 0.8679245, a: 1}
+    - _DetailAlbedo: {r: 1, g: 1, b: 1, a: 1}
+    - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+  m_BuildTextureStacks: []

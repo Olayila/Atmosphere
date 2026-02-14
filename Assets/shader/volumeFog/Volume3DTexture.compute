@@ -1,0 +1,63 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel VolumeFogMain
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+RWTexture2D<float4> Result;
+float4 _encodingParams;
+
+
+ //'z' is the view space Z position (linear depth).
+ //saturate(z) the output of the function to clamp them to the [0, 1] range.
+ //d = log2(c * (z - n) + 1) / log2(c * (f - n) + 1)
+ //  = log2(c * (z - n + 1/c)) / log2(c * (f - n) + 1)
+ //  = log2(c) / log2(c * (f - n) + 1) + log2(z - (n - 1/c)) / log2(c * (f - n) + 1)
+ //  = E + F * log2(z - G)
+ //encodingParams = { E, F, G, 0 }
+float EncodeLogarithmicDepthGeneralized(float z, float4 encodingParams)
+{
+    // Use max() to avoid NaNs.
+    return encodingParams.x + encodingParams.y * log2(max(0, z - encodingParams.z));
+}
+
+ //'d' is the logarithmically encoded depth value.
+ //saturate(d) to clamp the output of the function to the [n, f] range.
+ //z = 1/c * (pow(c * (f - n) + 1, d) - 1) + n
+ //  = 1/c * pow(c * (f - n) + 1, d) + n - 1/c
+ //  = 1/c * exp2(d * log2(c * (f - n) + 1)) + (n - 1/c)
+ //  = L * exp2(d * M) + N
+ //decodingParams = { L, M, N, 0 }
+ //Graph: https://www.desmos.com/calculator/qrtatrlrba
+float DecodeLogarithmicDepthGeneralized(float d, float4 decodingParams)
+{
+    return decodingParams.x * exp2(d * decodingParams.y) + decodingParams.z;
+}
+
+inline float EyeDepthToProj(float lin, float4 ZBufferParams)
+{
+    return (1 / lin - ZBufferParams.w) / ZBufferParams.z;
+}
+
+float3 GetPosWS(float3 center)
+{
+    float3 volumeSize = _VolumeSize.xyz;
+    float3 uvz = saturate(center.xyz / volumeSize);
+    float viewZ = DecodeLogarithmicDepthGeneralized(uvz.z, _LogarithmicDepthDecodingParams);
+#if UNITY_REVERSED_Z
+    float devZ = (1 - EyeDepthToProj(viewZ, _ZParam)) * 2 - 1;
+#else
+    float devZ = EyeDepthToProj(viewZ, _ZParam) * 2 - 1;
+#endif
+    float4 positionWS = mul(_InverseVP, float4(uvz.xy * 2.0 - 1.0, devZ, 1.0));
+    positionWS /= positionWS.w;
+    return positionWS;
+}
+
+
+[numthreads(8,8,1)]
+void VolumeFogMain(uint3 id : SV_DispatchThreadID)
+{
+    // TODO: insert actual code here!
+
+    Result[id.xy] = float4(id.x & id.y, (id.x & 15)/15.0, (id.y & 15)/15.0, 0.0);
+}
