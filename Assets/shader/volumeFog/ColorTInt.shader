@@ -1,5 +1,17 @@
 Shader "Hidden/PostProcessing/ColorTint"
 {
+    Properties
+    {
+        [KeywordEnum(Volumetric, Atmospheric)]
+        _CloudMode ("Cloud Mode", Float) = 0
+        // 体积云专用（可选加 [HideInInspector] 当不是体积模式时隐藏）
+        [HideInInspector] _VolumeThickness ("Thickness", Range(100,5000)) = 1000
+        [HideInInspector] _MarchSteps ("March Steps", Range(16,128)) = 64
+        
+        // 大气云专用（billboard/imp-post 或 2D 云层）
+        [HideInInspector] _CloudTexture ("Cloud Texture (Atmospheric)", 2D) = "white" {}
+
+    }
     SubShader
     {
 
@@ -16,8 +28,9 @@ Shader "Hidden/PostProcessing/ColorTint"
         HLSLINCLUDE
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"            
             #include "Packages/com.unity.render-pipelines.core/Runtime/Utilities/Blit.hlsl"
-             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+
              #define _RAYSTEP 2
              // 定义宏对应的预设值（硬编码，性能最好）
             #if defined(SCENE_DENSE_CLOUD)
@@ -33,16 +46,20 @@ Shader "Hidden/PostProcessing/ColorTint"
             #endif
             #define _PLANETRADIUS 6360000
             
-             SAMPLER(sampler_BlitTexture);
+            SAMPLER(sampler_BlitTexture);
             float _BlendMultiply;
             float4 _Color;
             float4 _PhaseParams;
+            float4 _ShapeNoiseWeights;
+            float _DetailNoiseWeight;
+            float _WeatherFactor;
+
             float4x4 _InverseProjectionMatrix;//教程中指出，但shader应该可以自动获取
             float4x4 _InverseViewMatrix;
             float3 _boundsMin;
             float3 _boundsMax;
 
-            float _step;
+            float _DetialWeights;
             float _rayStep;
             float _darknessThreshold;
             float4 _colA;
@@ -52,11 +69,18 @@ Shader "Hidden/PostProcessing/ColorTint"
             float _lightAbsorptionTowardSun;
             float _lightAbsorptionThroughCloud;
             TEXTURE3D(_noiseTex);
+            TEXTURE3D(_noiseDetailTex);
             SAMPLER(sampler_noiseTex);
             float _texScale;
 
             TEXTURE2D(_transmittanceLut);
-             TEXTURE2D(_weatherMap);
+            TEXTURE2D(_weatherMap);
+
+            TEXTURE2D(_BlueNoiseTex);
+            SAMPLER(sampler_BlueNoiseTex);  
+            float2 _BlueNoiseTexUV;
+            float _BlueNoiseEffect;
+
             SAMPLER(samplerLinearClamp);  
             SAMPLER(samplerLinearRepeat);  
 
@@ -164,7 +188,7 @@ Shader "Hidden/PostProcessing/ColorTint"
                 return SAMPLE_TEXTURE2D_X(_transmittanceLut, samplerLinearClamp,  uv);
     
             }
-
+            //debuggingfunction
             float cloudRayMarching(float3 startPoint, float3 direction) 
             {
                 float3 testPoint = startPoint;
@@ -208,40 +232,57 @@ Shader "Hidden/PostProcessing/ColorTint"
             //采样3DTexture
             float sampleDensity(float3 rayPos) 
             {
-                /*
+             #if _CLOUDMODE_VOLUMETRIC
                 float3 boundsCentre = (_boundsMax + _boundsMin) * 0.5;
                 float3 size = _boundsMax - _boundsMin;
                 float2 uv = (size.xz * 0.5f + (rayPos.xz - boundsCentre.xz) ) /max(size.x,size.z);
                 float3 uvw = rayPos  * _texScale;
-                */
-                //=================================
-
-                //采样天空球
-                //=================================
-                float2 uv =float2( rayPos.xz*_texScale);
-                
-                float4 weatherMap =  SAMPLE_TEXTURE2D_X(_weatherMap, samplerLinearRepeat,  uv);
-                /*
-                float gMin = remap(weatherMap.x, 0, 1, 0.1, 0.6);
-                 float gMax = remap(weatherMap.x, 0, 1, gMin, 0.9);
-                 float heightPercent = (rayPos.y - 1500.0) / 2500.0;
-                float heightGradient = saturate(remap(heightPercent, 0.0, gMin, 0, 1)) * saturate(remap(heightPercent, 1, gMax, 0, 1));
-                float heightGradient2 = saturate(remap(heightPercent, 0.0, weatherMap.r, 1, 0)) * saturate(remap(heightPercent, 0.0, gMin, 0, 1));
-                heightGradient = saturate(lerp(heightGradient, heightGradient2,1));
-                
                   //边缘衰减
                 const float containerEdgeFadeDst = 50;
                 float dstFromEdgeX = min(containerEdgeFadeDst, min(rayPos.x - _boundsMin.x, _boundsMax.x - rayPos.x));
                 float dstFromEdgeZ = min(containerEdgeFadeDst, min(rayPos.z - _boundsMin.z, _boundsMax.z - rayPos.z));
                 float edgeWeight = min(dstFromEdgeZ, dstFromEdgeX) / containerEdgeFadeDst;
+                float heightPercent = (rayPos.y - _boundsMin.y) / size.y;
                 
+            #elif _CLOUDMODE_ATMOSPHERIC
+                //=================================
+                //采样天空球
+                //=================================
+                float2 uv =float2( rayPos.xz*_texScale);
+                float heightPercent = (rayPos.y - 1500.0) / 2500.0;
+                //float3 uvw = rayPos  * _texScale;
+                float3 uvw = float3(uv.xy, heightPercent);
+            #endif
+                float4 weatherMap =  SAMPLE_TEXTURE2D_X(_weatherMap, samplerLinearRepeat,  uv);
+                float4 shapeNoise = SAMPLE_TEXTURE3D(_noiseTex, sampler_noiseTex, uvw);
+                float4 detailNoise =  SAMPLE_TEXTURE3D(_noiseDetailTex, sampler_noiseTex, uvw);
 
-                 // float4 shapeNoise = SAMPLE_TEXTURE3D(_noiseTex, sampler_noiseTex, uvw);
-                 // return shapeNoise.r*_darknessThreshold;
-                 heightGradient *= edgeWeight;
-                  return heightGradient;
-                  */
-                  return weatherMap.x;
+                float gMin = remap(weatherMap.x, 0, 1, 0.1, 0.6);
+                float gMax = remap(weatherMap.x, 0, 1, gMin, 0.9);
+                
+                float heightGradient = saturate(remap(heightPercent, 0.0, gMin, 0, 1)) * saturate(remap(heightPercent, 1, gMax, 0, 1));
+                float heightGradient2 = saturate(remap(heightPercent, 0.0, weatherMap.r, 1, 0)) * saturate(remap(heightPercent, 0.0, gMin, 0, 1));
+                heightGradient = saturate(lerp(heightGradient, heightGradient2,_WeatherFactor));
+
+            #if _CLOUDMODE_VOLUMETRIC
+                heightGradient *= edgeWeight;
+            #endif
+
+                float4 normalizedShapeWeights = _ShapeNoiseWeights / dot(_ShapeNoiseWeights, 1);
+                float shapeFBM = dot(shapeNoise, normalizedShapeWeights) * heightGradient;
+                float baseShapeDensity = shapeFBM + _colorOffset1 * 0.01;
+
+                if (baseShapeDensity > 0)
+                {
+                    float detailFBM = pow(detailNoise.r, _DetialWeights);
+                    float oneMinusShape = 1 - baseShapeDensity;
+                    float detailErodeWeight = oneMinusShape * oneMinusShape * oneMinusShape;
+                    float cloudDensity = baseShapeDensity- detailFBM * detailErodeWeight *_DetailNoiseWeight; // *;
+   
+                    return saturate(cloudDensity);//* _densityMultiplier
+                }
+                return 0;
+               
                 
              }
              //计算散射
@@ -271,15 +312,22 @@ Shader "Hidden/PostProcessing/ColorTint"
                 float rho_h = exp(-(h / H_M));
                 return sigma * rho_h;
             }
-
-             float3 lightmarch(float3 position ,float dstTravelled)
+            //=========================================
+            //内部对光步进
+            //=========================================
+            float3 lightmarch(float3 position ,float dstTravelled)
             {
                 Light mainLight = GetMainLight();
                 float3 dirToLight = mainLight.direction;
 
-                
+            #if _CLOUDMODE_VOLUMETRIC
+               
                //灯光方向与边界框求交，超出部分不计算
                float dstInsideBox = rayBoxDst(_boundsMin, _boundsMax, position, 1 / dirToLight).y;
+            #elif _CLOUDMODE_ATMOSPHERIC
+               float2 rayToContainerInfo = RayCloudLayerDst(1500,4000,position,dirToLight,true);               
+               float dstInsideBox = rayToContainerInfo.y;
+             #endif
                float stepSize = dstInsideBox / 8;
                float totalDensity = 0;
                
@@ -287,7 +335,6 @@ Shader "Hidden/PostProcessing/ColorTint"
                     position += dirToLight * stepSize; //向灯光步进
                     //totalDensity += max(0, sampleDensity(position) * stepSize);                     totalDensity += max(0, sampleDensity(position) * stepSize);
                     totalDensity += max(0, sampleDensity(position));
-
                 }
                 float3 lightTransmittance = TransmittanceToAtmosphere(float3(position.x,position.y+6366000.0,position.z) ,dirToLight);
                 //float transmittance = exp(-totalDensity * _lightAbsorptionTowardSun);
@@ -309,7 +356,7 @@ Shader "Hidden/PostProcessing/ColorTint"
             HLSLPROGRAM
             #pragma vertex Vert
             #pragma fragment Frag
-           
+            #pragma shader_feature _CLOUDMODE_VOLUMETRIC _CLOUDMODE_ATMOSPHERIC
 
             
             half4 Frag(Varyings input) : SV_Target
@@ -331,10 +378,11 @@ Shader "Hidden/PostProcessing/ColorTint"
                 float3 dirToLight = mainLight.direction;
                
                 float depthEyeLinear = length(worldPos.xyz - _WorldSpaceCameraPos);  
-                //=========================================
-                //容器中计算云体积包围盒
-                //=========================================
-                /*
+                
+            #if _CLOUDMODE_VOLUMETRIC
+            //=========================================
+            //容器中计算云体积包围盒
+            //=========================================
                 float2 rayToContainerInfo = rayBoxDst(_boundsMin, _boundsMax, rayPos, (1 / worldViewDir));
                 float dstToBox = rayToContainerInfo.x; //相机到容器的距离
                 float dstInsideBox = rayToContainerInfo.y; //返回光线是否在容器中，若为0则在内，不为零则为在内部的路程长度
@@ -342,43 +390,42 @@ Shader "Hidden/PostProcessing/ColorTint"
                 float dstLimit = min(depthEyeLinear - dstToBox, dstInsideBox);
                 //视线进入到volume时的世界坐标
                 float3 entryPoint = rayPos + worldViewDir * dstToBox;  
-                */
-                //=========================================
-                //球面上计算云包围球
-                //=========================================
+             #elif _CLOUDMODE_ATMOSPHERIC
+            //=========================================
+            //球面上计算云包围球
+            //=========================================
+                 if (abs(worldViewDir.y)<0.1) return color;
                  float2 rayToContainerInfo = RayCloudLayerDst(1500,4000,rayPos,worldViewDir,true);
                  float dstToBox = rayToContainerInfo.x;
                  float dstInsideBox = length(worldViewDir * rayToContainerInfo.y-worldViewDir);
                  float dstLimit = min(depthEyeLinear - dstToBox, dstInsideBox);
                   float3 entryPoint;
                  if(dstToBox<0.1) entryPoint = rayPos;
-                 else entryPoint = rayPos + worldViewDir * dstToBox;  
-                 //*全天空纹理映射
-                 /*
-                if(dstLimit < 0) return color;
-                float cur = sampleDensity(entryPoint);
-                return half4(cur*half3(1,1,1),1);
-                 
-                 */
+                 else entryPoint = rayPos + worldViewDir * dstToBox;
+            #endif
+
                 float cosAngle = dot(worldViewDir, dirToLight);
                 float3 phaseVal = phase(cosAngle);
                
                 float sumDensity = 1;
                 float3 lightEnergy = 0;
-                const float sizeLoop = 12;
+                const float sizeLoop = 24;
                 //指数加速采样，当前光线在云内的距离增长
                 //float stepSize = exp(_step)*_rayStep;
-               
-                 float dstTravelled = 0;
+                float3 boundsCentre = (_boundsMax + _boundsMin) * 0.5;
+                float3 size = _boundsMax - _boundsMin;
+                float2 uvblue = (size.xz * 0.5f + (entryPoint.xz - boundsCentre.xz) ) /max(size.x,size.z);
+                half blueNoise = SAMPLE_TEXTURE2D(_BlueNoiseTex, samplerLinearRepeat, uv*_BlueNoiseTexUV).r;
+                 float dstTravelled = blueNoise*_BlueNoiseEffect;
                  //*先把接近地平线的直接扣掉
-                 if (worldViewDir.y<0.1) return color;
+                 
                  for (int j = 0; j <sizeLoop; j++)
                 {
                     //当前点是否还在云中
                      if(dstLimit-dstTravelled>0.01 )
                        { 
                            //在volume内当前的marching的位置
-                           rayPos = entryPoint + (worldViewDir * dstTravelled);
+                            rayPos = entryPoint + (worldViewDir * dstTravelled);
                            //当前点雾密度
                            float density = sampleDensity(rayPos);
                             if (density > 0)
@@ -391,17 +438,7 @@ Shader "Hidden/PostProcessing/ColorTint"
                             if (sumDensity < 0.01)
                                break;
                             }
-                           // if (density > 0)
-                           // {
-                           //    float3 lightTransmittance = lightmarch(rayPos, dstTravelled);                              
-                           //    float3 s = RayleighCoefficient(rayPos.y)*phaseVal+MieCoefficient(rayPos.y);
-                           //    float t2 = exp(-sumDensity);
                            
-                           //  lightEnergy =lightTransmittance;
-                           //   if (t2 < 0.01)
-                           //       break;
-                           //  }
-                            //sumDensity+=density * _rayStep;
                         }
                         else break;
                          dstTravelled += _rayStep;
@@ -416,7 +453,7 @@ Shader "Hidden/PostProcessing/ColorTint"
                          return half4(whiteOverlay, color.a);  // 保持原有 alpha
                      }
  
-                 //return color + half4(cloud*half3(1,1,1),1);
+                 //return color + half4(blueNoise*half3(1,1,1),1);
                 
                    
                 

@@ -33,12 +33,22 @@ public class VolumeFogRendererFeature : ScriptableRendererFeature
         public Material postProcessMaterial;
         public RenderPassEvent renderPassEvent = RenderPassEvent.AfterRenderingSkybox;
         public Texture3D exampleNoise;
+        public Texture3D detailNoise;
+        [Range(0.0f, 250.0f)]
+        public float blueNoiseEffect = 8.0f;
+        [Range(0.0f, 1.0f)]
+        public float weatherFactor = 0.5f;
+        public Vector4 noiseWeights;
         public Texture2D transmittanceLut;
         public Texture2D weatherMap;
+        public Texture2D blueNoise;
+        public Vector2 blueNoiseUV;
         public float scale;
-        public float step = 8.0f;
+        public float detailWeights = 8.0f;
+        [Range(0.0f, 250.0f)]        
         public float rayStep = 8.0f;
         public float darknessThreshold;
+        public float detailNoiseWeight;
         public Color colA;
         public Color colB;
         public float colorOffset1;
@@ -131,7 +141,7 @@ public class VolumeFogRendererFeature : ScriptableRendererFeature
                 settings.postProcessMaterial.SetVector("_PhaseParams", phaseParams);
                 break;
         }
-        settings.postProcessMaterial.SetFloat("_step", settings.step);
+        settings.postProcessMaterial.SetFloat("_DetialWeights", settings.detailWeights);
         settings.postProcessMaterial.SetFloat("_rayStep", settings.rayStep);
         settings.postProcessMaterial.SetFloat("_darknessThreshold", settings.darknessThreshold);
         settings.postProcessMaterial.SetFloat("_colorOffset1", settings.colorOffset1);
@@ -140,7 +150,14 @@ public class VolumeFogRendererFeature : ScriptableRendererFeature
         settings.postProcessMaterial.SetColor("_colA", settings.colA);
         settings.postProcessMaterial.SetTexture("_transmittanceLut", settings.transmittanceLut);
         settings.postProcessMaterial.SetTexture("_weatherMap", settings.weatherMap);
+        settings.postProcessMaterial.SetTexture("_noiseDetailTex", settings.detailNoise);
+        settings.postProcessMaterial.SetTexture("_BlueNoiseTex", settings.blueNoise);
         settings.postProcessMaterial.SetFloat("_lightAbsorptionThroughCloud", settings.lightAbsorptionThroughCloud);
+        settings.postProcessMaterial.SetFloat("_BlueNoiseEffect", settings.blueNoiseEffect);
+        settings.postProcessMaterial.SetFloat("_WeatherFactor", settings.weatherFactor);
+        settings.postProcessMaterial.SetFloat("_DetailNoiseWeight", settings.detailNoiseWeight);
+        settings.postProcessMaterial.SetVector("_ShapeNoiseWeights", settings.noiseWeights);
+        settings.postProcessMaterial.SetVector("_BlueNoiseTexUV", settings.blueNoiseUV);
 
         renderer.EnqueuePass(pass);
     }
@@ -241,6 +258,7 @@ public class VolumeFogRendererFeature : ScriptableRendererFeature
             material.SetVector("_boundsMin", boundsMin);
             material.SetVector("_boundsMax", boundsMax);
             material.SetTexture("_noiseTex",exampleNoise);
+            
             material.SetFloat("_texScale", scale);
             // 再设置矩阵（类似你原来的逻辑）
             Camera cam = renderingData.cameraData.camera;

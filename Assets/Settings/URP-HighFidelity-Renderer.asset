@@ -18,20 +18,27 @@ MonoBehaviour:
       type: 2}
     renderPassEvent: 400
     exampleNoise: {fileID: 11700000, guid: 4ed99a7ccafd728408a1bd580f472384, type: 2}
+    detailNoise: {fileID: 11700000, guid: d2993425f654940448af634a1d7cf838, type: 2}
+    blueNoiseEffect: 24
+    weatherFactor: 0.67
+    noiseWeights: {x: 1.33, y: 0.1, z: 0.52, w: 0.62}
     transmittanceLut: {fileID: 2800000, guid: 1211aac1098a94b4c8677150a0296977, type: 3}
-    weatherMap: {fileID: 2800000, guid: 4d2edaa3d9ff0e34781278842213aecd, type: 3}
-    scale: 1.27
-    step: 2
-    rayStep: 1
-    darknessThreshold: 0.08
+    weatherMap: {fileID: 2800000, guid: 4fc8578dbfa02c94fb44da4d7b155ead, type: 2}
+    blueNoise: {fileID: 2800000, guid: 71187b5ae4538b1488239297d8b831d6, type: 3}
+    blueNoiseUV: {x: 20, y: 19.37}
+    scale: 1.44
+    detailWeights: 0.85
+    rayStep: 3
+    darknessThreshold: 0.05
+    detailNoiseWeight: 0.35
     colA: {r: 0, g: 0, b: 0, a: 0}
     colB: {r: 0, g: 0, b: 0, a: 0}
-    colorOffset1: 2.06
-    colorOffset2: 11.11
-    lightAbsorptionTowardSun: 1.94
+    colorOffset1: 1.9
+    colorOffset2: 1.97
+    lightAbsorptionTowardSun: 0.77
     lightAbsorptionThroughCloud: 2.02
     scenePreset: 0
-    customPhaseParams: {x: 0.8, y: 0.45, z: 0.5, w: 0.59}
+    customPhaseParams: {x: 0.55, y: 0.45, z: 0.5, w: 0.59}
 --- !u!114 &-1878332245247344467
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -87,7 +94,8 @@ MonoBehaviour:
   - {fileID: -1878332245247344467}
   - {fileID: -2951225052191784223}
   - {fileID: 5133791252696552080}
-  m_RendererFeatureMap: adc0de57c6d2eee5e102e08773240bd79052fcbff1e33e47
+  - {fileID: 553111760473323374}
+  m_RendererFeatureMap: adc0de57c6d2eee5e102e08773240bd79052fcbff1e33e476e771a34370cad07
   m_UseNativeRenderPass: 0
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   xrSystemData: {fileID: 11400000, guid: 60e1133243b97e347b653163a8c01b64, type: 2}
@@ -136,6 +144,19 @@ MonoBehaviour:
   m_CopyDepthMode: 0
   m_AccurateGbufferNormals: 0
   m_IntermediateTextureMode: 1
+--- !u!114 &553111760473323374
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b5495f09a19ba864e961d11903d4c606, type: 3}
+  m_Name: TAA
+  m_EditorClassIdentifier: 
+  m_Active: 1
 --- !u!114 &5133791252696552080
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -148,9 +169,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9ba199a718d0dd744b75d1a1dec24079, type: 3}
   m_Name: AerialFogRendererFeature
   m_EditorClassIdentifier: 
-  m_Active: 0
+  m_Active: 1
   settings:
     postProcessMaterial: {fileID: 2100000, guid: 420e380431186514fa5d9938aa0eb586,
       type: 2}
     renderPassEvent: 400
-    fogDense: 7.2
+    fogDense: 5
