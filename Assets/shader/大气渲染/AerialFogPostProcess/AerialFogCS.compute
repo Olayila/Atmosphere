@@ -155,7 +155,7 @@ float3 TransmittanceToAtmosphere(float3 p, float3 dir, Texture2D lut, SamplerSta
     
     float3 upVector = normalize(p);
     float cos_theta = dot(upVector, dir);
-    float r = length(p) * 1e-3;
+    float r = length(p) ;
     
     float2 uv = GetTransmittanceLutUv(bottomRadius, topRadius, cos_theta, r);
     return lut.SampleLevel(spl, uv, 0).rgb;

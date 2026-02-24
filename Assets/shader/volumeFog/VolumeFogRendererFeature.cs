@@ -6,6 +6,7 @@ using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
+using static UnityEditor.ShaderGraph.Internal.KeywordDependentCollection;
 
 //控制 Volume Profile 的 Add Override 下拉菜单菜单在 Olayila → Color Tint
 [VolumeComponentMenuForRenderPipeline("Olayila/Color Tint", typeof(UniversalRenderPipeline))]
@@ -32,29 +33,28 @@ public class VolumeFogRendererFeature : ScriptableRendererFeature
         //inspector中的参数
         public Material postProcessMaterial;
         public RenderPassEvent renderPassEvent = RenderPassEvent.AfterRenderingSkybox;
-        public Texture3D exampleNoise;
-        public Texture3D detailNoise;
-        [Range(0.0f, 250.0f)]
-        public float blueNoiseEffect = 8.0f;
-        [Range(0.0f, 1.0f)]
-        public float weatherFactor = 0.5f;
-        public Vector4 noiseWeights;
-        public Texture2D transmittanceLut;
-        public Texture2D weatherMap;
-        public Texture2D blueNoise;
-        public Vector2 blueNoiseUV;
-        public float scale;
-        public float detailWeights = 8.0f;
-        [Range(0.0f, 250.0f)]        
-        public float rayStep = 8.0f;
-        public float darknessThreshold;
-        public float detailNoiseWeight;
-        public Color colA;
-        public Color colB;
-        public float colorOffset1;
-        public float colorOffset2;
-        public float lightAbsorptionTowardSun;
-        public float lightAbsorptionThroughCloud;
+
+        //控制渲染分辨率部分分辨率缩放
+        [Header("控制渲染分辨率部分")]
+        [Tooltip("分辨率缩放")]
+        [Range(0.1f, 1)]
+        public float RTScale = 0.5f;
+
+        [Tooltip("分帧渲染")]      
+        public FrameBlock FrameBlocking = FrameBlock._4x4;
+
+        [Tooltip("屏蔽相机分辨率宽度(受纹理缩放影响)")]
+        [Range(100, 600)]
+        public int ShieldWidth = 400;
+
+        [Tooltip("是否开启分帧测试")]
+        public bool IsFrameDebug = false;
+
+        [Tooltip("分帧测试")]
+        [Range(1, 16)]
+        public int FrameDebug = 1;        
+
+        
         //不同场景对应的phaseParam
         public enum FogScenePreset
         {
@@ -73,10 +73,16 @@ public class VolumeFogRendererFeature : ScriptableRendererFeature
     [SerializeField]
     public Settings settings = new Settings();
     private VolumeFogPass pass;
+    public enum FrameBlock
+    {
+        _Off = 1,
+        _2x2 = 4,
+        _4x4 = 16
+    }
 
     private Vector3 boundsMin;
     private Vector3 boundsMax;
-
+    private int _frameCount_sceneView;
     // ==========================================================================
     //  创建渲染的pass
     // ==========================================================================
@@ -92,10 +98,13 @@ public class VolumeFogRendererFeature : ScriptableRendererFeature
         //需要在此处传入渲染pass的参数
         //settings.postProcessMaterial = 
         //
-        pass.Setup(settings.postProcessMaterial, settings.renderPassEvent, settings.exampleNoise, settings.scale,boundsMin, boundsMax);
+        pass.Setup(settings,settings.postProcessMaterial, settings.renderPassEvent,boundsMin, boundsMax);
         // 根据预设设置 phase params
         Vector4 phaseParams;
-
+        int width = (int)(renderingData.cameraData.cameraTargetDescriptor.width * settings.RTScale);
+        int height = (int)(renderingData.cameraData.cameraTargetDescriptor.height * settings.RTScale);
+        pass.width = width;
+        pass.height = height;
         switch (settings.scenePreset)
         {
             case Settings.FogScenePreset.DenseVolumetricCloud:
@@ -141,24 +150,41 @@ public class VolumeFogRendererFeature : ScriptableRendererFeature
                 settings.postProcessMaterial.SetVector("_PhaseParams", phaseParams);
                 break;
         }
-        settings.postProcessMaterial.SetFloat("_DetialWeights", settings.detailWeights);
-        settings.postProcessMaterial.SetFloat("_rayStep", settings.rayStep);
-        settings.postProcessMaterial.SetFloat("_darknessThreshold", settings.darknessThreshold);
-        settings.postProcessMaterial.SetFloat("_colorOffset1", settings.colorOffset1);
-        settings.postProcessMaterial.SetFloat("_colorOffset2", settings.colorOffset2);
-        settings.postProcessMaterial.SetFloat("_lightAbsorptionTowardSun", settings.lightAbsorptionTowardSun);
-        settings.postProcessMaterial.SetColor("_colA", settings.colA);
-        settings.postProcessMaterial.SetTexture("_transmittanceLut", settings.transmittanceLut);
-        settings.postProcessMaterial.SetTexture("_weatherMap", settings.weatherMap);
-        settings.postProcessMaterial.SetTexture("_noiseDetailTex", settings.detailNoise);
-        settings.postProcessMaterial.SetTexture("_BlueNoiseTex", settings.blueNoise);
-        settings.postProcessMaterial.SetFloat("_lightAbsorptionThroughCloud", settings.lightAbsorptionThroughCloud);
-        settings.postProcessMaterial.SetFloat("_BlueNoiseEffect", settings.blueNoiseEffect);
-        settings.postProcessMaterial.SetFloat("_WeatherFactor", settings.weatherFactor);
-        settings.postProcessMaterial.SetFloat("_DetailNoiseWeight", settings.detailNoiseWeight);
-        settings.postProcessMaterial.SetVector("_ShapeNoiseWeights", settings.noiseWeights);
-        settings.postProcessMaterial.SetVector("_BlueNoiseTexUV", settings.blueNoiseUV);
 
+        if (settings.FrameBlocking == FrameBlock._Off)
+        {
+            settings.postProcessMaterial.EnableKeyword("_OFF");
+            settings.postProcessMaterial.DisableKeyword("_2X2");
+            settings.postProcessMaterial.DisableKeyword("_4X4");
+           
+        }
+        if (settings.FrameBlocking == FrameBlock._2x2)
+        {
+            settings.postProcessMaterial.DisableKeyword("_OFF");
+            settings.postProcessMaterial.EnableKeyword("_2X2");
+            settings.postProcessMaterial.DisableKeyword("_4X4");
+           
+        }
+        if (settings.FrameBlocking == FrameBlock._4x4)
+        {
+            settings.postProcessMaterial.DisableKeyword("_OFF");
+            settings.postProcessMaterial.DisableKeyword("_2X2");
+            settings.postProcessMaterial.EnableKeyword("_4X4");
+            
+        }
+
+        if (settings.IsFrameDebug)
+        {
+            settings.postProcessMaterial.SetInt("_FrameCount", settings.FrameDebug);
+        }
+        else
+        {
+            _frameCount_sceneView = (++_frameCount_sceneView) % (int)settings.FrameBlocking;
+            settings.postProcessMaterial.SetInt("_FrameCount", _frameCount_sceneView);
+        }
+        
+       
+       
         renderer.EnqueuePass(pass);
     }
     // ==========================================================================
@@ -177,31 +203,58 @@ public class VolumeFogRendererFeature : ScriptableRendererFeature
         private Material material;
         private RTHandle source;//保存“当前要处理的画面”
         private RTHandle tempTexture;//一个临时中间纹理
+
         private Vector3 boundsMin;
         private Vector3 boundsMax;
-        private Texture3D exampleNoise;
-        private float scale;
 
-        public void Setup(Material mat,RenderPassEvent renderPassEvent,Texture3D texture3D, float scale,Vector3 boundsMin, Vector3 boundsMax)
+        //云纹理的宽度
+        public int width;
+        //云纹理的高度
+        public int height;
+
+        private int frameCount;
+        //纹理切换
+        public int rtSwitch;
+
+        private Matrix4x4 prevViewProjMatrix = Matrix4x4.identity;
+
+        private Settings settings;
+        private RTHandle accumA;
+        private RTHandle accumB;
+        private RTHandle currentRead;   // 上一帧累积结果
+        private RTHandle currentWrite;  // 本帧要写的新累积结果
+
+        public void Setup(Settings settings,Material mat,RenderPassEvent renderPassEvent, Vector3 boundsMin, Vector3 boundsMax)
         {
             this.material = mat;
             this.renderPassEvent = renderPassEvent;
+
             this.boundsMin = boundsMin;
-            this.boundsMax = boundsMax;
-            this.exampleNoise = texture3D;
-            this.scale = scale;
+            this.boundsMax = boundsMax;  
+
+            this.settings = settings;
+           
+            //this,height = height;
+            //this.width = width;
+            //this.frameCount = 0;
         }
 
         public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
         {
             // 获取相机目标纹理
             var cameraTargetDescriptor = renderingData.cameraData.cameraTargetDescriptor;
-            // 如果需要降采样可以改这里
-            // cameraTargetDescriptor.width /= 4; cameraTargetDescriptor.height /= 4;
-
-            //如果当前的 tempTexture 不存在、尺寸/格式/设置跟传入的 cameraTargetDescriptor 不匹配，或者根本没分配过 → 就（重新）创建一个新的 RenderTexture，并用 RTHandle 包装它；
-            //如果已经匹配 → 什么都不做，直接复用现有的。
-            RenderingUtils.ReAllocateIfNeeded(ref tempTexture, cameraTargetDescriptor, name: "_TempPixelate");
+            var desc = renderingData.cameraData.cameraTargetDescriptor;
+            desc.depthBufferBits = 0;
+            desc.colorFormat = RenderTextureFormat.ARGBHalf;  // 推荐 half 或 float
+            //RenderingUtils.ReAllocateIfNeeded(ref tempTexture, cameraTargetDescriptor, name: "_TempPixelate");
+            RenderingUtils.ReAllocateIfNeeded(ref accumA, desc, FilterMode.Bilinear, TextureWrapMode.Clamp, name: "_CloudAccumA");
+            RenderingUtils.ReAllocateIfNeeded(ref accumB, desc, FilterMode.Bilinear, TextureWrapMode.Clamp, name: "_CloudAccumB");
+            if (currentRead == null)
+            {
+                currentRead = accumA;
+                currentWrite = accumB;
+                // cmd.ClearRenderTarget(false, true, Color.black);  // 可选
+            }
         }
         public void SetSource(RTHandle src) => source = src;
 
@@ -211,8 +264,8 @@ public class VolumeFogRendererFeature : ScriptableRendererFeature
             // ==========================================================================
             // 执行前准备工作
             // ==========================================================================
-            var stack = VolumeManager.instance.stack;
-            var settings = stack.GetComponent<ColorTintVolume>();
+            //var stack = VolumeManager.instance.stack;
+            //var settings = stack.GetComponent<ColorTintVolume>();
             if (material == null) return;
             // 2. 只对 Game 主相机执行（避免 Scene视图/预览/Overlay 崩溃）
             //if (renderingData.cameraData.cameraType != CameraType.Game ||
@@ -239,9 +292,13 @@ public class VolumeFogRendererFeature : ScriptableRendererFeature
                 return;
             }
 
-            desc.depthBufferBits = 0;  // 后处理不需要深度
+           desc.depthBufferBits = 0;  // 后处理不需要深度
             RenderingUtils.ReAllocateIfNeeded(ref tempTexture, desc, FilterMode.Bilinear, TextureWrapMode.Clamp, name: "_TempFog");
 
+            var temp = currentRead;
+            currentRead = currentWrite;
+            currentWrite = temp;
+            cmd.SetGlobalTexture("_MainTex", currentRead);
             if (tempTexture == null || tempTexture.rt == null)
             {
                 Debug.LogWarning("VolumeFogPass: tempTexture allocation failed");
@@ -253,35 +310,46 @@ public class VolumeFogRendererFeature : ScriptableRendererFeature
             // 设定材质属性
             // ==========================================================================
             // 从 Volume 取值
-            material.SetColor("_Color", settings.color.value);
-            material.SetFloat("_BlendMultiply", settings.blend.value);
+            //material.SetColor("_Color", settings.color.value);
+           // material.SetFloat("_BlendMultiply", settings.blend.value);
             material.SetVector("_boundsMin", boundsMin);
             material.SetVector("_boundsMax", boundsMax);
-            material.SetTexture("_noiseTex",exampleNoise);
-            
-            material.SetFloat("_texScale", scale);
+           // material.SetInt("_FrameCount", settings.FrameDebug);
+            material.SetInt("_Width", width-1);
+            material.SetInt("_Height", height-1);
+
             // 再设置矩阵（类似你原来的逻辑）
             Camera cam = renderingData.cameraData.camera;
 
             // GPU 投影矩阵（注意：第三个参数 false 表示不翻转 Y，URP 通常这样用）
             Matrix4x4 proj = GL.GetGPUProjectionMatrix(cam.projectionMatrix, false);
             material.SetMatrix("_InverseProjectionMatrix", proj.inverse);
-
+           // cmd.SetGlobalTexture("_");
             // 视图逆矩阵（cameraToWorldMatrix 就是 view 的逆）
             material.SetMatrix("_InverseViewMatrix", cam.cameraToWorldMatrix);
             // ==========================================================================
             // Blit：用material把cameratarget写到temptexture中，cmd作为一个命令收集器收集这次指令
             // ==========================================================================
+
+
+
             // Blit：源 → temp → 屏幕
             // 第一步：相机 → temp（应用材质）
-            Blitter.BlitCameraTexture(cmd, cameraTarget, tempTexture, material, 0);
-
+            //Blitter.BlitCameraTexture(cmd, cameraTarget, tempTexture, material, 0);
+            // material.SetTexture("_MainTex", tempTexture);
             // 第二步：temp → 相机（纯拷贝，无材质）
-            Blitter.BlitCameraTexture(cmd, tempTexture, cameraTarget);
+            //Blitter.BlitCameraTexture(cmd, tempTexture, cameraTarget);
+            Blitter.BlitCameraTexture(cmd, cameraTarget, currentWrite, material, 0);
 
+            // 第二步：新累积结果写回相机（显示给玩家）
+            Blitter.BlitCameraTexture(cmd, currentWrite, cameraTarget);
             // 7. 执行并释放
             context.ExecuteCommandBuffer(cmd);
             CommandBufferPool.Release(cmd);
+            var cameraData = renderingData.cameraData;
+            Matrix4x4 viewProj = cameraData.camera.projectionMatrix * cameraData.camera.worldToCameraMatrix;
+            material.SetMatrix("_PrevViewProjMatrix", viewProj);
+
         }
     }
 

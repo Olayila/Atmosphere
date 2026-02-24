@@ -17,26 +17,11 @@ MonoBehaviour:
     postProcessMaterial: {fileID: 2100000, guid: d7c1de5d02e619d4aa8b32f0e2ed6b14,
       type: 2}
     renderPassEvent: 400
-    exampleNoise: {fileID: 11700000, guid: 4ed99a7ccafd728408a1bd580f472384, type: 2}
-    detailNoise: {fileID: 11700000, guid: d2993425f654940448af634a1d7cf838, type: 2}
-    blueNoiseEffect: 24
-    weatherFactor: 0.67
-    noiseWeights: {x: 1.33, y: 0.1, z: 0.52, w: 0.62}
-    transmittanceLut: {fileID: 2800000, guid: 1211aac1098a94b4c8677150a0296977, type: 3}
-    weatherMap: {fileID: 2800000, guid: 4fc8578dbfa02c94fb44da4d7b155ead, type: 2}
-    blueNoise: {fileID: 2800000, guid: 71187b5ae4538b1488239297d8b831d6, type: 3}
-    blueNoiseUV: {x: 20, y: 19.37}
-    scale: 1.44
-    detailWeights: 0.85
-    rayStep: 3
-    darknessThreshold: 0.05
-    detailNoiseWeight: 0.35
-    colA: {r: 0, g: 0, b: 0, a: 0}
-    colB: {r: 0, g: 0, b: 0, a: 0}
-    colorOffset1: 1.9
-    colorOffset2: 1.97
-    lightAbsorptionTowardSun: 0.77
-    lightAbsorptionThroughCloud: 2.02
+    RTScale: 0.42
+    FrameBlocking: 16
+    ShieldWidth: 307
+    IsFrameDebug: 0
+    FrameDebug: 10
     scenePreset: 0
     customPhaseParams: {x: 0.55, y: 0.45, z: 0.5, w: 0.59}
 --- !u!114 &-1878332245247344467
@@ -174,4 +159,4 @@ MonoBehaviour:
     postProcessMaterial: {fileID: 2100000, guid: 420e380431186514fa5d9938aa0eb586,
       type: 2}
     renderPassEvent: 400
-    fogDense: 5
+    fogDense: 8.61

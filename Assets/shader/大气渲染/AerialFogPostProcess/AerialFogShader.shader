@@ -53,7 +53,7 @@ Shader "Olayila/AerialFogPostProcess"
                 
                 float2 uv = float2(atan2(viewDir.z, viewDir.x), acos(viewDir.y));
                 uv /= float2(2.0 * PI, PI);
-                uv += float2(-0.5, 0.5);
+                uv += float2(0.5, 0.5);
                 return uv;               
 
             }
