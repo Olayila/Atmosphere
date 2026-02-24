@@ -1,6 +1,6 @@
 // ================================================
-//  URP È«ÆÁºó´¦Àí Shader Ä£°å£¨ÍÆ¼öĞ´·¨£©
-//  ÊÊÓÃÓÚ URP 14.x ~ 17.x / Unity 2022.3 ~ 6000.x
+//  URP å…¨å±åå¤„ç† Shader æ¨¡æ¿ï¼ˆæ¨èå†™æ³•ï¼‰
+//  é€‚ç”¨äº URP 14.x ~ 17.x / Unity 2022.3 ~ 6000.x
 // ================================================
 
 Shader "Olayila/AerialFogPostProcess"
@@ -11,7 +11,7 @@ Shader "Olayila/AerialFogPostProcess"
         { 
             "RenderType" = "Opaque"
             "RenderPipeline" = "UniversalPipeline"
-            "Queue" = "Geometry"    // »ò Transparent£¬¸ù¾İĞèÇó
+            "Queue" = "Geometry"    // æˆ– Transparentï¼Œæ ¹æ®éœ€æ±‚
         }
 
         LOD 100
@@ -20,7 +20,7 @@ Shader "Olayila/AerialFogPostProcess"
         Cull Off
 
         HLSLINCLUDE
-            //ºó´¦ÀíshaderÍ¨³£ÓÃµ½ÕâÁ½¸öÎÄ¼ş
+            //åå¤„ç†shaderé€šå¸¸ç”¨åˆ°è¿™ä¸¤ä¸ªæ–‡ä»¶
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"            
             #include "Packages/com.unity.render-pipelines.core/Runtime/Utilities/Blit.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
@@ -53,30 +53,30 @@ Shader "Olayila/AerialFogPostProcess"
                 
                 float2 uv = float2(atan2(viewDir.z, viewDir.x), acos(viewDir.y));
                 uv /= float2(2.0 * PI, PI);
-                uv += float2(-0.5, 0.5);
+                uv += float2(0.5, 0.5);
                 return uv;               
 
             }
 
              float4 GetWorldSpacePosition(float depth, float2 uv)
             {
-                 // ÆÁÄ»¿Õ¼ä --> ÊÓ×¶¿Õ¼ä
+                 // å±å¹•ç©ºé—´ --> è§†é”¥ç©ºé—´
                  float4 view_vector = mul(_InverseProjectionMatrix, float4(2.0 * uv - 1.0, depth, 1.0));
                  view_vector.xyz /= view_vector.w;
-                 //ÊÓ×¶¿Õ¼ä --> ÊÀ½ç¿Õ¼ä
+                 //è§†é”¥ç©ºé—´ --> ä¸–ç•Œç©ºé—´
                  float4x4 l_matViewInv = _InverseViewMatrix;
                  float4 world_vector = mul(l_matViewInv, float4(view_vector.xyz, 1));
                  return world_vector;
              }
             
             // =====================================
-            //  ³£ÓÃÎÆÀíÉùÃ÷£¨¸ù¾İĞèÇóÑ¡Ôñ£©
+            //  å¸¸ç”¨çº¹ç†å£°æ˜ï¼ˆæ ¹æ®éœ€æ±‚é€‰æ‹©ï¼‰
             // =====================================
-            // TEXTURE2D_X(_BlitTexture);          URP Ïà»úÑÕÉ«Ä¿±ê£¨Blitter ×Ô¶¯°ó¶¨£©
+            // TEXTURE2D_X(_BlitTexture);          URP ç›¸æœºé¢œè‰²ç›®æ ‡ï¼ˆBlitter è‡ªåŠ¨ç»‘å®šï¼‰
          
             // float PlanetRadius;
             // float AtmosphereHeight;
-            // float3 sunLuminance;                    ×¢ÒâÊÇ float3£¬²»ÊÇ Vector3
+            // float3 sunLuminance;                    æ³¨æ„æ˜¯ float3ï¼Œä¸æ˜¯ Vector3
            
             // float threash;
             // float4x4 CameraToWorld;
@@ -86,7 +86,7 @@ Shader "Olayila/AerialFogPostProcess"
         ENDHLSL
 
         // --------------------
-        //  Pass 0 - Ö÷Ğ§¹û
+        //  Pass 0 - ä¸»æ•ˆæœ
         // --------------------
         Pass
         {
@@ -103,7 +103,7 @@ Shader "Olayila/AerialFogPostProcess"
                 float2 uv = input.texcoord; 
                 float depth01 = SampleSceneDepth(uv);
                 // =====================================
-                //  »ñÈ¡Ö÷ÑÕÉ«£¨Ïà»úäÖÈ¾½á¹û£©
+                //  è·å–ä¸»é¢œè‰²ï¼ˆç›¸æœºæ¸²æŸ“ç»“æœï¼‰
                 // =====================================
                 
                half4 ScreenCol = SAMPLE_TEXTURE2D_X(_BlitTexture, sampler_BlitTexture, uv);
@@ -111,14 +111,14 @@ Shader "Olayila/AerialFogPostProcess"
                 float depth = SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, sampler_CameraDepthTexture, uv);
                 float4 worldPos = GetWorldSpacePosition(depth, uv);
                 float3 camPos = _WorldSpaceCameraPos;
-                 //Ïà»úµ½Ã¿¸öÏñËØµÄÊÀ½ç·½Ïò
+                 //ç›¸æœºåˆ°æ¯ä¸ªåƒç´ çš„ä¸–ç•Œæ–¹å‘
                  float3 worldViewDir = normalize(worldPos.xyz - camPos.xyz) ;
                 
                  float distToCamera = length(worldPos.xyz - camPos.xyz);
                   float normalizedDist = min(distToCamera*_fogDense / max(_AerialPerspectiveDistance, 1e-5),1.0);
                 float2 uv_aerialLut =ViewToUV( worldViewDir);
 
-                //¼ÆËãµ±Ç°Éî¶ÈËùÔÚµÄaerialË÷Òı£¬ÒÔ¼°ÏÂÒ»¸öË÷Òı£¬²¢ÒÔĞ¡ÊıÖµ×÷Îªlerpfactor
+                //è®¡ç®—å½“å‰æ·±åº¦æ‰€åœ¨çš„aerialç´¢å¼•ï¼Œä»¥åŠä¸‹ä¸€ä¸ªç´¢å¼•ï¼Œå¹¶ä»¥å°æ•°å€¼ä½œä¸ºlerpfactor
                 float lutIndex =floor( normalizedDist *(N_SAMPLE - 1));
                 float lutIndex_next =min(lutIndex + 1,N_SAMPLE - 1);
                 float lerpFactor = normalizedDist *(N_SAMPLE - 1) - lutIndex;
@@ -133,7 +133,7 @@ Shader "Olayila/AerialFogPostProcess"
                 float3 col = ScreenCol*col_aerial.w+col_aerial.xyz;
                    //col = (step(1-7e-07,depth01))*ScreenCol +(1- step(1-7e-07,depth01))*col;
                 // =====================================
-                //  ·µ»Ø×îÖÕÑÕÉ«
+                //  è¿”å›æœ€ç»ˆé¢œè‰²
                 // =====================================
                 //return col;
                 
