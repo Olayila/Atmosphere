@@ -98,6 +98,11 @@ public class VolumeFogRendererFeature : ScriptableRendererFeature
         //需要在此处传入渲染pass的参数
         //settings.postProcessMaterial = 
         //
+        if (   // 排除预览等
+        renderingData.cameraData.renderType != CameraRenderType.Base) // 关键：只 Base 执行
+        {
+            return;  // Overlay 或其他类型相机直接跳过
+        }
         pass.Setup(settings,settings.postProcessMaterial, settings.renderPassEvent,boundsMin, boundsMax);
         // 根据预设设置 phase params
         Vector4 phaseParams;
@@ -153,23 +158,23 @@ public class VolumeFogRendererFeature : ScriptableRendererFeature
 
         if (settings.FrameBlocking == FrameBlock._Off)
         {
-            settings.postProcessMaterial.EnableKeyword("_OFF");
-            settings.postProcessMaterial.DisableKeyword("_2X2");
-            settings.postProcessMaterial.DisableKeyword("_4X4");
+            Shader.EnableKeyword("_OFF");
+            Shader.DisableKeyword("_2X2");
+            Shader.DisableKeyword("_4X4");
            
         }
         if (settings.FrameBlocking == FrameBlock._2x2)
         {
-            settings.postProcessMaterial.DisableKeyword("_OFF");
-            settings.postProcessMaterial.EnableKeyword("_2X2");
-            settings.postProcessMaterial.DisableKeyword("_4X4");
+            Shader.DisableKeyword("_OFF");
+            Shader.EnableKeyword("_2X2");
+            Shader.DisableKeyword("_4X4");
            
         }
         if (settings.FrameBlocking == FrameBlock._4x4)
         {
-            settings.postProcessMaterial.DisableKeyword("_OFF");
-            settings.postProcessMaterial.DisableKeyword("_2X2");
-            settings.postProcessMaterial.EnableKeyword("_4X4");
+            Shader.DisableKeyword("_OFF");
+            Shader.DisableKeyword("_2X2");
+            Shader.EnableKeyword("_4X4");
             
         }
 
@@ -215,8 +220,9 @@ public class VolumeFogRendererFeature : ScriptableRendererFeature
         private int frameCount;
         //纹理切换
         public int rtSwitch;
+        private Vector2Int lastResolution = Vector2Int.zero;
+        private CameraType lastCameraType = CameraType.Game;
 
-        private Matrix4x4 prevViewProjMatrix = Matrix4x4.identity;
 
         private Settings settings;
         private RTHandle accumA;
@@ -224,6 +230,12 @@ public class VolumeFogRendererFeature : ScriptableRendererFeature
         private RTHandle currentRead;   // 上一帧累积结果
         private RTHandle currentWrite;  // 本帧要写的新累积结果
 
+        private Matrix4x4 prevViewMatrix = Matrix4x4.identity;
+        private Matrix4x4 prevProjMatrix = Matrix4x4.identity;
+        private Matrix4x4 iPrevViewMatrix = Matrix4x4.identity;
+        private Matrix4x4 iPrevProjMatrix = Matrix4x4.identity;
+        private Vector3 prevCameraPos = Vector3.zero;
+        private Quaternion prevCameraRot = Quaternion.identity;
         public void Setup(Settings settings,Material mat,RenderPassEvent renderPassEvent, Vector3 boundsMin, Vector3 boundsMax)
         {
             this.material = mat;
@@ -241,22 +253,22 @@ public class VolumeFogRendererFeature : ScriptableRendererFeature
 
         public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
         {
-            // 获取相机目标纹理
-            var cameraTargetDescriptor = renderingData.cameraData.cameraTargetDescriptor;
+            // 获取相机目标纹理           
             var desc = renderingData.cameraData.cameraTargetDescriptor;
             desc.depthBufferBits = 0;
             desc.colorFormat = RenderTextureFormat.ARGBHalf;  // 推荐 half 或 float
             //RenderingUtils.ReAllocateIfNeeded(ref tempTexture, cameraTargetDescriptor, name: "_TempPixelate");
             RenderingUtils.ReAllocateIfNeeded(ref accumA, desc, FilterMode.Bilinear, TextureWrapMode.Clamp, name: "_CloudAccumA");
             RenderingUtils.ReAllocateIfNeeded(ref accumB, desc, FilterMode.Bilinear, TextureWrapMode.Clamp, name: "_CloudAccumB");
-            if (currentRead == null)
+            if (currentRead == null || renderingData.cameraData.cameraType != lastCameraType)
             {
                 currentRead = accumA;
                 currentWrite = accumB;
                 // cmd.ClearRenderTarget(false, true, Color.black);  // 可选
             }
+            lastCameraType = renderingData.cameraData.cameraType;
         }
-        public void SetSource(RTHandle src) => source = src;
+       // public void SetSource(RTHandle src) => source = src;
 
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
         {
@@ -293,18 +305,18 @@ public class VolumeFogRendererFeature : ScriptableRendererFeature
             }
 
            desc.depthBufferBits = 0;  // 后处理不需要深度
-            RenderingUtils.ReAllocateIfNeeded(ref tempTexture, desc, FilterMode.Bilinear, TextureWrapMode.Clamp, name: "_TempFog");
+           // RenderingUtils.ReAllocateIfNeeded(ref tempTexture, desc, FilterMode.Bilinear, TextureWrapMode.Clamp, name: "_TempFog");
 
             var temp = currentRead;
             currentRead = currentWrite;
             currentWrite = temp;
             cmd.SetGlobalTexture("_MainTex", currentRead);
-            if (tempTexture == null || tempTexture.rt == null)
-            {
-                Debug.LogWarning("VolumeFogPass: tempTexture allocation failed");
-                CommandBufferPool.Release(cmd);
-                return;
-            }
+            //if (tempTexture == null || tempTexture.rt == null)
+            //{
+            //    Debug.LogWarning("VolumeFogPass: tempTexture allocation failed");
+            //    CommandBufferPool.Release(cmd);
+            //    return;
+            //}
             #endregion 
             // ==========================================================================
             // 设定材质属性
@@ -319,36 +331,39 @@ public class VolumeFogRendererFeature : ScriptableRendererFeature
             material.SetInt("_Height", height-1);
 
             // 再设置矩阵（类似你原来的逻辑）
-            Camera cam = renderingData.cameraData.camera;
-
+            Camera cam = renderingData.cameraData.camera;            
             // GPU 投影矩阵（注意：第三个参数 false 表示不翻转 Y，URP 通常这样用）
             Matrix4x4 proj = GL.GetGPUProjectionMatrix(cam.projectionMatrix, false);
-            material.SetMatrix("_InverseProjectionMatrix", proj.inverse);
-           // cmd.SetGlobalTexture("_");
-            // 视图逆矩阵（cameraToWorldMatrix 就是 view 的逆）
-            material.SetMatrix("_InverseViewMatrix", cam.cameraToWorldMatrix);
+            Matrix4x4 iProj = proj.inverse;
+            Matrix4x4 camToWorld = cam.cameraToWorldMatrix;
+            material.SetMatrix("_InverseProjectionMatrix", iProj);          
+            material.SetMatrix("_InverseViewMatrix", camToWorld);
+            //上一帧相机位置
+         
+            material.SetMatrix("_InverseCamToWorldMatrix", iPrevViewMatrix);          
+            material.SetMatrix("_InversePrevProjMatrix", iPrevProjMatrix);
+          
+
             // ==========================================================================
             // Blit：用material把cameratarget写到temptexture中，cmd作为一个命令收集器收集这次指令
             // ==========================================================================
 
 
-
-            // Blit：源 → temp → 屏幕
-            // 第一步：相机 → temp（应用材质）
-            //Blitter.BlitCameraTexture(cmd, cameraTarget, tempTexture, material, 0);
-            // material.SetTexture("_MainTex", tempTexture);
-            // 第二步：temp → 相机（纯拷贝，无材质）
-            //Blitter.BlitCameraTexture(cmd, tempTexture, cameraTarget);
             Blitter.BlitCameraTexture(cmd, cameraTarget, currentWrite, material, 0);
-
-            // 第二步：新累积结果写回相机（显示给玩家）
             Blitter.BlitCameraTexture(cmd, currentWrite, cameraTarget);
+            //保存当前帧的rotation和pos供下一帧采样用
+            prevCameraPos = cam.transform.position;
+            prevCameraRot = cam.transform.rotation;
+
+            prevViewMatrix = camToWorld;
+            prevProjMatrix = iProj ;
+            iPrevViewMatrix = camToWorld.inverse ;
+            iPrevProjMatrix = proj;
             // 7. 执行并释放
             context.ExecuteCommandBuffer(cmd);
             CommandBufferPool.Release(cmd);
-            var cameraData = renderingData.cameraData;
-            Matrix4x4 viewProj = cameraData.camera.projectionMatrix * cameraData.camera.worldToCameraMatrix;
-            material.SetMatrix("_PrevViewProjMatrix", viewProj);
+           
+            
 
         }
     }

@@ -1,5 +1,42 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-3681145875384681552
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6d613f08f173d4dd895bb07b3230baa9, type: 3}
+  m_Name: FullScreenPassRendererFeature
+  m_EditorClassIdentifier: 
+  m_Active: 0
+  injectionPoint: 600
+  fetchColorBuffer: 1
+  requirements: 0
+  passMaterial: {fileID: 2100000, guid: 8ea27ab061c5d894c9b07242b6a92260, type: 2}
+  passIndex: 0
+  bindDepthStencilAttachment: 0
+  m_Version: 1
+--- !u!114 &-3447454945792688624
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7b0dd083dd3557a4e9d3f37d20866b81, type: 3}
+  m_Name: OutlineRendererFeature
+  m_EditorClassIdentifier: 
+  m_Active: 1
+  settings:
+    postProcessMaterial: {fileID: 2100000, guid: 8ea27ab061c5d894c9b07242b6a92260,
+      type: 2}
+    renderPassEvent: 350
 --- !u!114 &-2951225052191784223
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -17,11 +54,11 @@ MonoBehaviour:
     postProcessMaterial: {fileID: 2100000, guid: d7c1de5d02e619d4aa8b32f0e2ed6b14,
       type: 2}
     renderPassEvent: 400
-    RTScale: 0.42
-    FrameBlocking: 16
-    ShieldWidth: 307
+    RTScale: 1
+    FrameBlocking: 1
+    ShieldWidth: 347
     IsFrameDebug: 0
-    FrameDebug: 10
+    FrameDebug: 5
     scenePreset: 0
     customPhaseParams: {x: 0.55, y: 0.45, z: 0.5, w: 0.59}
 --- !u!114 &-1878332245247344467
@@ -78,9 +115,11 @@ MonoBehaviour:
   m_RendererFeatures:
   - {fileID: -1878332245247344467}
   - {fileID: -2951225052191784223}
-  - {fileID: 5133791252696552080}
   - {fileID: 553111760473323374}
-  m_RendererFeatureMap: adc0de57c6d2eee5e102e08773240bd79052fcbff1e33e476e771a34370cad07
+  - {fileID: 5133791252696552080}
+  - {fileID: -3681145875384681552}
+  - {fileID: -3447454945792688624}
+  m_RendererFeatureMap: adc0de57c6d2eee5e102e08773240bd76e771a34370cad079052fcbff1e33e47b03b4d7354f1e9cc10fedc00fe2d28d0
   m_UseNativeRenderPass: 0
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   xrSystemData: {fileID: 11400000, guid: 60e1133243b97e347b653163a8c01b64, type: 2}
@@ -141,7 +180,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b5495f09a19ba864e961d11903d4c606, type: 3}
   m_Name: TAA
   m_EditorClassIdentifier: 
-  m_Active: 1
+  m_Active: 0
 --- !u!114 &5133791252696552080
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -154,9 +193,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9ba199a718d0dd744b75d1a1dec24079, type: 3}
   m_Name: AerialFogRendererFeature
   m_EditorClassIdentifier: 
-  m_Active: 1
+  m_Active: 0
   settings:
     postProcessMaterial: {fileID: 2100000, guid: 420e380431186514fa5d9938aa0eb586,
       type: 2}
     renderPassEvent: 400
-    fogDense: 8.61
+    fogDense: 18.39

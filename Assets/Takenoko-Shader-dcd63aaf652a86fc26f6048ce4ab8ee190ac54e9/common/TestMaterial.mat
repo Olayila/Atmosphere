@@ -19,7 +19,6 @@ Material:
   - _TK_DETAIL_BLEND_LINNER
   - _TK_DETAIL_MAPPINGMODE_NONE
   - _TK_DETAIL_SAMPLERMODE_NONE
-  - _TK_THINFILM_ON
   m_InvalidKeywords:
   - _LIGHTMAPMODE_SH
   - _SHMODE_NONLINER
@@ -220,7 +219,7 @@ Material:
     - _ThinFilmMiddleThickness: 1
     - _ThinFilmMiddleThicknessMax: 135
     - _ThinFilmMiddleThicknessMin: 203.9
-    - _ThinFilm_ON: 1
+    - _ThinFilm_ON: 0
     - _WorkflowMode: 1
     - _ZWrite: 1
     m_Colors:
@@ -232,7 +231,7 @@ Material:
     - _ClothAlbedo2: {r: 1, g: 0, b: 0.09999997, a: 1}
     - _ClothTangentOffset1: {r: -25, g: -25, b: 25, a: 25}
     - _ClothTangentOffset2: {r: 0, g: 0, b: 0, a: 0}
-    - _Color: {r: 0.8207547, g: 0.8207547, b: 0.8207547, a: 1}
+    - _Color: {r: 0.6981132, g: 0.5446839, b: 0.26673195, a: 1}
     - _D: {r: 0.21475615, g: 0.28793004, b: 0.3584906, a: 0}
     - _DetailAlbedo: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}

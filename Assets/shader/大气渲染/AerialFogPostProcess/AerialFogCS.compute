@@ -155,7 +155,7 @@ float3 TransmittanceToAtmosphere(float3 p, float3 dir, Texture2D lut, SamplerSta
     
     float3 upVector = normalize(p);
     float cos_theta = dot(upVector, dir);
-    float r = length(p) ;
+    float r = length(p) * 1e-3;//change r manually could get more dense fog both day and night
     
     float2 uv = GetTransmittanceLutUv(bottomRadius, topRadius, cos_theta, r);
     return lut.SampleLevel(spl, uv, 0).rgb;
@@ -217,7 +217,7 @@ void CSFogMain(uint3 id : SV_DispatchThreadID)
             p = p + viewDir * ds;
         }
         float3 p_start = eyePos;
-        float3 p_end = eyePos + viewDir * p2;;
+        float3 p_end = eyePos + viewDir * p2;
         if (viewDir.y < 0)
         {
             viewDir = -viewDir;

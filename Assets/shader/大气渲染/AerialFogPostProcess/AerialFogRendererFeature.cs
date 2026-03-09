@@ -9,7 +9,7 @@ public class AerialFogRendererFeature : ScriptableRendererFeature
     {
         //inspector中的参数
         public Material postProcessMaterial;
-        public RenderPassEvent renderPassEvent = RenderPassEvent.AfterRenderingSkybox;//决定渲染顺序
+        public RenderPassEvent renderPassEvent = RenderPassEvent.AfterRenderingSkybox+10;//决定渲染顺序
         public float fogDense;
 
     }
@@ -30,6 +30,13 @@ public class AerialFogRendererFeature : ScriptableRendererFeature
 
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
     {
+
+        if (   // 排除预览等
+        renderingData.cameraData.renderType != CameraRenderType.Base) // 关键：只 Base 执行
+        {
+            return;  // Overlay 或其他类型相机直接跳过
+        }
+
         pass.Setup(
            settings.postProcessMaterial,
            skyScatterRT,

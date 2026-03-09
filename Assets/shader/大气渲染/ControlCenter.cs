@@ -49,7 +49,7 @@ public class ControlCenter : MonoBehaviour
     //全局使用静态参数
    
     //地球基础信息
-    static private float SeaLevel = 0.0f;
+   // static private float SeaLevel = 0.0f;
     static private float planetRadius = 6360000.0f;
     static private float atmosphereHeight = 80000.0f;
 
@@ -497,18 +497,18 @@ public class ControlCenter : MonoBehaviour
         string pngPath = Path.Combine(directoryPath, $"{name}.png");
 
         string filePath = null;
-        TextureFormat texFormat = TextureFormat.RGBA32;
+        //TextureFormat texFormat = TextureFormat.RGBA32;
 
         if (File.Exists(exrPath))
         {
             filePath = exrPath;
-            texFormat = TextureFormat.RGBAFloat;   // 或 RGBAFloat，看你需求
+            //texFormat = TextureFormat.RGBAFloat;   // 或 RGBAFloat，看你需求
             Debug.Log("存在exr文件");
         }
         else if (File.Exists(pngPath))
         {
             filePath = pngPath;
-            texFormat = TextureFormat.RGBA32;
+            //texFormat = TextureFormat.RGBA32;
             Debug.Log("存在png文件");
         }
         else
