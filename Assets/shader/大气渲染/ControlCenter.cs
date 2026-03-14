@@ -34,8 +34,11 @@ public class ControlCenter : MonoBehaviour
     [Header("光源调整")]
     [Range(0.01f, 23.99f)]
     public float dayTime = 10.0f;  //调整时间    
+    public float dayLengthInSeconds = 600f;
+    private float timeAccumulator = 0f;
     public float SunLightIntensity = 31.4f;
     public Color SunLightColor = Color.white;//可选
+    public Color DownColor = Color.white;//可选
     //可选
     public float MoonIntensity = 2.4f;
     public Color NightColor = Color.blue;//可选
@@ -94,7 +97,7 @@ public class ControlCenter : MonoBehaviour
     [SerializeField]
     private UniversalRendererData rendererData;
     private AerialFogRendererFeature aerialFogFeature;
-
+   
     void OnValidate()
     {
         isDirty = true;
@@ -112,8 +115,18 @@ public class ControlCenter : MonoBehaviour
     void Update()
     {
         //逐帧更新太阳角度
+        timeAccumulator += Time.deltaTime;
+
+        // 计算一天内的进度（0~1）
+        float progress = timeAccumulator / dayLengthInSeconds;
+
+        // 从 6 到 18 线性插值
+        dayTime = Mathf.Lerp(6f, 18f, progress);
+        Color currentCol = Color.Lerp(SunLightColor, DownColor, progress);
         Vector3 sunRot = new Vector3((dayTime - 6.0f) * 15.0f, directionalLight.transform.rotation.y, directionalLight.transform.rotation.z);
+        sunRot.y = -90.0f;
         directionalLight.transform.rotation = Quaternion.Euler(sunRot);
+        
         if (dayTime >= 0f && dayTime < 6f)
         {
             // 夜晚 -> dawn
@@ -135,7 +148,7 @@ public class ControlCenter : MonoBehaviour
             float t = (dayTime - 18f) / 6f; // 0-1            
         }
 
-        directionalLight.color = SunLightColor;
+        directionalLight.color = currentCol;
         sunDir = -directionalLight.transform.forward;
         eyePos = new Vector3(0f, planetRadius + cam.transform.position.y, 0f);//在当前坐标基础上增加地球半径
 
@@ -164,14 +177,14 @@ public class ControlCenter : MonoBehaviour
     private IEnumerator ComputeTransmittanceLutCoroutine()
     {
         #region 透射率采样表预计算
-        transmittanceLutRT = new RenderTexture(width * 2, height, 0, RenderTextureFormat.ARGBFloat);
+        transmittanceLutRT = new RenderTexture(width , height/2, 0, RenderTextureFormat.ARGBFloat);
         transmittanceLutRT.enableRandomWrite = true;
         transmittanceLutRT.Create();
 
         int kernel_Post = transmittanceCS.FindKernel("CSTransmittanceLut");
 
         transmittanceCS.SetTexture(kernel_Post, "_TransmittanceLut", transmittanceLutRT);
-        transmittanceCS.Dispatch(kernel_Post, width / 4, height / 8, 1);
+        transmittanceCS.Dispatch(kernel_Post, width / 8, height / 16, 1);
         #endregion 透射率采样表预计算
         Shader.SetGlobalTexture("_transmittanceLut", transmittanceLutRT);
         //保存透射率采样表

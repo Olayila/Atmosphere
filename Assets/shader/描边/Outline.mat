@@ -66,7 +66,7 @@ Material:
         m_Offset: {x: 0, y: 0}
     - _ShadowTexture:
         m_Texture: {fileID: 2800000, guid: 2244a734c53f5c5458d3b5e09861df3c, type: 3}
-        m_Scale: {x: 5.23, y: 16.47}
+        m_Scale: {x: 4.02, y: 16.47}
         m_Offset: {x: 0, y: 0}
     - _SpecGlossMap:
         m_Texture: {fileID: 0}
@@ -124,7 +124,7 @@ Material:
     m_Floats:
     - _AlphaClip: 0
     - _AlphaToMask: 0
-    - _BaseThicknessScreen: 2.57
+    - _BaseThicknessScreen: 0.15
     - _Blend: 0
     - _BlendModePreserveSpecular: 1
     - _BumpScale: 1
@@ -133,6 +133,7 @@ Material:
     - _Color_threshold: 1.71
     - _Cull: 2
     - _Cutoff: 0.5
+    - _DepthStrength: 5.4
     - _Depth_threshold: 0.112
     - _DetailAlbedoMapScale: 1
     - _DetailNormalMapScale: 1
@@ -143,30 +144,32 @@ Material:
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
-    - _GradientScale: 55.24
+    - _GradientScale: 20
     - _HAVETEX: 0
     - _Metallic: 0
-    - _NoiseScale: 0.63
-    - _NoiseStrength: 0
+    - _NoiseScale: 7.1
+    - _NoiseStrength: 0.5
     - _OVERLAY: 1
     - _OcclusionStrength: 1
     - _Parallax: 0.005
     - _QueueControl: 0
     - _QueueOffset: 0
     - _ReceiveShadows: 1
-    - _RingIntervalScreen: 0.166
-    - _Sensitivity: 7.93
+    - _RingIntervalScreen: 0.02
+    - _Sensitivity: 2.5
+    - _ShakeAmplitude: 0.3
+    - _ShakeSpeed: 0.85
     - _Smoothness: 0.5
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1
     - _SrcBlendAlpha: 1
-    - _Strength: 6.59
+    - _Strength: 7.06
     - _Surface: 0
-    - _TexelSize: 2.85
+    - _TexelSize: 28.9
     - _Thickness: 0.05
-    - _ThicknessScaleByDepth: 2.04
-    - _Threshold: 0.01
+    - _ThicknessScaleByDepth: 16.1
+    - _Threshold: 0.0018
     - _WorkflowMode: 1
     - _ZWrite: 1
     - _normal_threshold: 1
@@ -176,7 +179,7 @@ Material:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _OutlineColor: {r: 0.10644352, g: 0.14069057, b: 0.16352195, a: 1}
+    - _OutlineColor: {r: 0.17755431, g: 0.24083304, b: 0.2830189, a: 1}
     - _Outline_Color: {r: 0.4056604, g: 0.4056604, b: 0.4056604, a: 0}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
     - _color: {r: 0.58, g: 0.9, b: 1.2, a: 1}

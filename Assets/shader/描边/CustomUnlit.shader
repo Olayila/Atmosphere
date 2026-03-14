@@ -100,6 +100,7 @@ Shader "Hidden/SimpleUnlitMainLightWithNormalAndShadow"
             CBUFFER_START(UnityPerMaterial)
                 float4 _BaseMap_ST;
                 half4  _BaseColor;
+                half4  _FarColor;
                 half   _BumpScale;
             CBUFFER_END
 
@@ -129,7 +130,9 @@ Shader "Hidden/SimpleUnlitMainLightWithNormalAndShadow"
             half4 frag(Varyings IN) : SV_Target
             {
                 // 1. 读取基础颜色
-                half4 baseColor = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, IN.uv) * _BaseColor;
+                float t = IN.uv.x;                   // 0→1
+                float accelerated = pow(t, 2);
+                half4 baseColor = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, IN.uv) * lerp(_BaseColor,_FarColor, 1-accelerated);
 
                 // 2. 计算切线空间 → 世界空间法线（使用 normal map）
                 half3 normalTS = UnpackNormalScale(SAMPLE_TEXTURE2D(_BumpMap, sampler_BumpMap, IN.uv*10), _BumpScale);
@@ -154,7 +157,7 @@ Shader "Hidden/SimpleUnlitMainLightWithNormalAndShadow"
                 // half NdotL = NdotL * 0.5 + 0.5;                   // 半兰伯特（可选）
 
                 // 5. 最终颜色 = 基础色 × 主光颜色 × N·L × 距离衰减 × 阴影
-                half3 lighting = baseColor.rgb * NdotL * distanceAtten;
+                half3 lighting = baseColor.rgb  * distanceAtten;
 
             #if _RECEIVE_SHADOWS
                 lighting *= shadowAtten;
